@@ -3498,7 +3498,7 @@ var PIANCHANG_DD = (function () {
       return (intro ? intro + '\n' : '') + (wb ? wb + '\n' : '') + (Array.isArray(pb) ? pb.join('\n') : String(pb || ''));
     }
     var L = Lx();
-    var extra = c.kind === 'K' ? '\n（' + K_NAME + '能做的：提醒、出主意、去要别人的联系方式；面板里的事——排片、开机、记账——他替' + uc(s) + '点不了，只能提醒。）' : '';
+    var extra = c.kind === 'K' ? '\n（' + K_NAME + '能做的：提醒、出主意、去要别人的联系方式——要到了，就在消息最后单独一行写 (推名片|那个人的全名)，' + uc(s) + '的' + APP + '通讯录里就有了这个人；面板里的事——排片、开机、记账——他替' + uc(s) + '点不了，只能提醒。）' : '';
     if (c.kind === 'K' || c.kind === 'staff') return ((wb || (L.staff && L.staff[c.name]) || '') + extra).trim();
     if (wb) return wb;
     if (c.kind === 'visitor' && L.visitors && L.visitors[c.name]) return L.visitors[c.name];
@@ -3527,6 +3527,8 @@ var PIANCHANG_DD = (function () {
       }).filter(function (l) { return l.length > 4; }).join('\n');
     } catch (e) { return ''; }
   }
+  // 最近 8 楼只留字、不带「正文：」「U：」行头：查某个名字在正文里出没出过场用
+  async function storyText() { return (await mainContext()).replace(new RegExp('^(?:正文|' + escRe(uc()) + ')：', 'gm'), ''); }
   // 最新一条 AI 楼的正文（洗过），判断谁「在场」用
   async function floorText(mesId) {
     try { var ms = await getChatMessages(String(mesId)); var m = ms && ms[0]; return m && m.role === 'assistant' ? washFloor(m.message) : ''; } catch (e) { return ''; }
@@ -3555,7 +3557,7 @@ var PIANCHANG_DD = (function () {
   }
   function phoneRule(s) {
     var U = uc(s);
-    return '【' + APP + '】正文里有人此刻会在' + APP + '上给' + U + '发消息（人不在跟前、事后想起来、要报信），就在这条回复的最后另起几行写：\n' +
+    return '【' + APP + '】正文里有人此刻会在' + APP + '上给' + U + '发消息（人不在跟前、事后想起来、要报信，或者刚和' + U + '当面加了' + APP + '、发一句打招呼），就在这条回复的最后另起几行写：\n' +
       '<!--' + APP + '\n名字：消息\n-->\n' +
       '一行一条，最多三条，名字写全名，消息像真人打字一样短；' + U + '自己发的不写；没有就整段不写。拉黑过' + U + '的人在正文里明确和好了，可以写「名字：(解除拉黑)」。';
   }
@@ -4345,12 +4347,33 @@ var PIANCHANG_DD = (function () {
   // 回来的消息落档 + 刷新屏幕 / 注入 / 写进正文（单发、一起发、对方先开口共用）
   //   对方先开口的不立刻写进正文：等玩家回了，这一段从水位线起一起写（不然没读的消息先出现在正文里）
   var CONTACT_ASK = /联系方式|微信|加.{0,4}(联系人|好友)|号码|叮叮|盯盯/;
+  // 小柯推过来的名片 → 通讯录里的人（10-26 玩家报：小柯答应了、通讯录没进人）
+  //   面试见过的接回原档案 t_<id>；别的人只要世界书里有、或者要联系方式那句话 / 最近的正文里提过名字，就开 n_<名字>（人设照 personaOf 的兜底读正文）
+  async function cardTarget(name, s, ask) {
+    var n = String(name || '').trim(); if (n === K_NICK) n = K_NAME;
+    if (n.length < 2 || n.length > 12 || n === uc(s)) return null;
+    var met = (s.met || []).find(function (m) { return m && [m.realName, m.name, m.stageName].indexOf(n) >= 0; });
+    var had = contactByName(n, s) || (met && findChat('t_' + met.id, s));
+    if (had) return { id: had.id, name: had.name, had: true };
+    if (met) return { id: 't_' + met.id, name: met.realName || met.name, info: { kind: 'met', name: met.realName || met.name } };
+    if (String(ask || '').indexOf(n) >= 0 || await wbNpc(n) || (await storyText()).indexOf(n) >= 0) return { id: 'n_' + n, name: n, info: { kind: 'free', name: n } };
+    return null;
+  }
   async function applyReply(id, c, res, o) {
     o = o || {};
-    var seen = viewing(id), gave = null;
-    if (c.kind === 'K' && !kViaMain() && o.ask && CONTACT_ASK.test(o.ask)) {   // 「把联系方式给我」：正文里见过的人（面谈过的新人），小柯去要
-      var s0 = st(), who = (s0.met || []).find(function (m) { return m && (m.realName || m.name) && o.ask.indexOf(m.realName || m.name) >= 0; });
-      if (who && !contacts(s0).some(function (x) { return x.id === 't_' + who.id; })) gave = who;
+    var seen = viewing(id), gave = [];
+    if (c.kind === 'K') {
+      var s0 = st(), cards = res.filter(function (m) { return m.kind === 'card'; });
+      res = res.filter(function (m) { return m.kind !== 'card'; });
+      for (var ci = 0; ci < cards.length; ci++) {
+        var tg = await cardTarget(cards[ci].text, s0, o.ask);
+        if (!tg) { try { console.warn('[叮叮] 小柯推的名片对不上人：', cards[ci].text); } catch (e) {} }
+        else if (!tg.had && !gave.some(function (g) { return g.id === tg.id; })) gave.push(tg);
+      }
+      if (!cards.length && !kViaMain() && o.ask && CONTACT_ASK.test(o.ask)) {   // 他忘了写名片那一行：「把联系方式给我」里点了名的面试新人照旧给
+        var who = (s0.met || []).find(function (m) { return m && (m.realName || m.name) && o.ask.indexOf(m.realName || m.name) >= 0; });
+        if (who && !contacts(s0).some(function (x) { return x.id === 't_' + who.id; })) gave.push({ id: 't_' + who.id, name: who.realName || who.name, info: { kind: 'met', name: who.realName || who.name } });
+      }
     }
     await C.save(function (s2) {
       res.forEach(function (m) {
@@ -4364,7 +4387,7 @@ var PIANCHANG_DD = (function () {
         }
       });
       var out = res.filter(function (m) { return c.group ? (m.kind !== 'block' && m.kind !== 'unblock') : true; });
-      if (gave) { addContact(s2, 't_' + gave.id, { kind: 'met', name: gave.realName || gave.name }); out = out.concat([Object.assign({ id: mid() + 'g', sender: id, senderName: K_NAME, kind: 'note' }, stamp(s2), { text: K_NAME + '把 ' + (gave.realName || gave.name) + ' 加进了你的' + APP })]); }
+      gave.forEach(function (g, gi) { addContact(s2, g.id, g.info); out.push(Object.assign({ id: mid() + 'g' + gi, sender: id, senderName: K_NAME, kind: 'note' }, stamp(s2), { text: K_NAME + '把 ' + g.name + ' 加进了你的' + APP })); });
       pushMsgs(s2, id, out, seen);
     });
     if (seen) { if (res.some(function (m) { return m.kind === 'block' || m.kind === 'unblock'; })) renderChat(id); else renderMessages(id); }   // 拉黑状态变了：头部也要换
@@ -4398,6 +4421,7 @@ var PIANCHANG_DD = (function () {
       return Object.assign(base, { kind: 'transfer', amount: Math.min(capOf(c), Math.max(1, Math.round(parseFloat(m[1])))), note: String(m[2] || '').slice(0, 20), opened: false, text: '' });
     }
     if ((m = line.match(/^[\(（]?\s*语音\s*[|｜:：+]\s*(.+?)\s*[\)）]?$/))) return Object.assign(base, { kind: 'voice', text: m[1].slice(0, 160), secs: voiceSecs(m[1]) });
+    if (c.kind === 'K' && (m = line.match(/^[\(（]\s*推名片\s*[|｜:：]\s*(.+?)\s*[\)）]$/))) return Object.assign(base, { kind: 'card', text: m[1].replace(/[\[\]【】「」《》*]/g, '').trim() });   // 只在 applyReply 里认，不落档
     if (/^[\(（]?\s*(收款|收下转账|领取红包|收下)\s*[\)）]?$/.test(line)) return Object.assign(base, { kind: 'claim', text: '' });
     if (/^[\(（]\s*解除拉黑\s*[\)）]$/.test(line)) return c.group ? null : Object.assign(base, { kind: 'unblock', text: '' });
     if ((m = line.match(/^[\(（]\s*拉黑\s*(?:[|｜:：]\s*(.*?))?\s*[\)）]$/))) return c.group ? null : Object.assign(base, { kind: 'block', text: String(m[1] || '').slice(0, 40) });
@@ -4812,10 +4836,11 @@ var PIANCHANG_DD = (function () {
   function quietNow(s) { try { return !!(C.quiet && C.quiet(s || st())); } catch (e) { return false; } }
   function isOn(k) { return cfg()[k] !== false; }
   // 正文里的名字 → 联系人（全名、艺名、本名、小柯都认）；通讯录里没有、但世界书里有【npc】条目的人，按「找过你的人」开个会话
-  async function chatForName(name, s) {
+  //   story（最近的正文，洗过、不含 <!--叮叮--> 块）：正文里现编出来、没有条目的人，只要正文里出过场也认（10-26：正文里当面加了叮叮的人发不进来）
+  async function chatForName(name, s, story) {
     var n = String(name || '').replace(/[\[\]【】「」*]/g, '').trim(); if (!n || n.length > 12) return null;
     var c = contactByName(n, s); if (c) return c;
-    if (await wbNpc(n)) return { id: 'n_' + n, name: n, sub: '找过你的人', kind: 'visitor' };
+    if (await wbNpc(n) || (n.length >= 2 && n !== uc(s) && story && story.indexOf(n) >= 0)) return { id: 'n_' + n, name: n, sub: '找过你的人', kind: 'visitor' };
     return null;
   }
   async function floorScan(mesId, type) {
@@ -4823,16 +4848,16 @@ var PIANCHANG_DD = (function () {
     var m = ms && ms[0]; if (!m || m.role !== 'assistant') return 0;
     var txt = String(m.message || ''), blocks = [], mm, re = new RegExp(PHONE_CMT_RE.source, 'gi');
     while ((mm = re.exec(txt))) blocks.push(mm[1] || '');
-    var s = st(), U = uc(s), userRe = userLineRe(s), t = stamp(s), land = {}, order = [], n = 0;
+    var s = st(), U = uc(s), userRe = userLineRe(s), t = stamp(s), land = {}, order = [], n = 0, story = blocks.length ? await storyText() : '';
     for (var b = 0; b < blocks.length; b++) {
       var lines = String(blocks[b]).split('\n');
       for (var i = 0; i < lines.length && n < 3; i++) {
         var line = lines[i].replace(/^\s*[-•·]\s*/, '').trim(); if (!line || userRe.test(line)) continue;
         var k = line.search(/[:：|｜]/); if (k <= 0 || k > 12) continue;
-        var c = await chatForName(line.slice(0, k), s); if (!c || c.group) continue;
+        var c = await chatForName(line.slice(0, k), s, story); if (!c || c.group) continue;
         var body = line.slice(k + 1).trim(); if (!body) continue;
         if (blockedOf(c.id, s) && !/^[\(（]\s*解除拉黑\s*[\)）]$/.test(body)) continue;   // 拉黑了 U 的人：只认「解除拉黑」
-        var msg = parseNpcLine(body, c, c.name, t); if (!msg) continue;
+        var msg = parseNpcLine(body, c, c.name, t); if (!msg || msg.kind === 'card') continue;
         msg.fromFloor = mesId;
         if (!land[c.id]) { land[c.id] = { c: c, msgs: [] }; order.push(c.id); }
         land[c.id].msgs.push(msg); n++;
