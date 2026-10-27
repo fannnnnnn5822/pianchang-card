@@ -379,6 +379,27 @@ var PIANCHANG_LISTS = {
   ],
   pings: { chance: 0.3, gap: 3, maxPending: 2 },
 
+  // ── 外包（v0.1.28，crazyman2333「社长线缺钱」）：社长线才有，跟日历邀约一起来（账上越紧来得越勤），一次只挂一单 ──
+  // AV 在走下坡、唯粉和主播在涨：找上门的多半是外行想借片商的手艺。who：叮叮里发消息的人（6 个字以内，不起人名）；fee：报酬上下限（人民币，代码在中间抽、取整到 500）
+  // text 里的 {价} 换成抽到的报酬；scene：点「现在就去」挂进正文的那一场（钱已经谈好，正文不用再谈）；bio：叮叮里跟这个人聊天时的人设
+  outsource: [
+    { who: '影楼老板娘', job: '私房写真代拍', where: '婚纱影楼的私房棚', fee: [6000, 12000], text: '影楼老板娘：周六有位客人订了一组私房写真，点名要「拍片子的人」来掌机，{价}，接不接？', scene: '影楼的私房棚里，老板娘把客人的要求一条条念出来：要好看、要大胆、脸可以拍但别太清楚。客人第一次拍这种，坐在化妆镜前比谁都紧张。', bio: '开了十五年婚纱影楼，这两年婚纱没人拍了，靠私房写真撑着；嘴甜，算账比谁都快。' },
+    { who: '夜店经理', job: '夜店开业宣传片', where: '歌舞伎町新开的夜店', fee: [15000, 30000], text: '夜店经理：下周五开业，要一支三十秒的宣传片，灯光、舞娘、香槟塔都齐了，{价}，就看你们拍不拍得出那个劲。', scene: '开业前一晚的夜店，灯光师在调频闪，舞娘在台上走位，经理拿着手机比划他要的那种「看一眼就想进来」的镜头。', bio: '歌舞伎町换过四家店的夜店经理，只认流量；说话快，钱给得爽快，改需求也快。' },
+    { who: '情趣店店长', job: '成人用品产品短片', where: '下北泽的成人用品店', fee: [8000, 15000], text: '情趣店店长：店里新到一批玩具，想拍几条产品短片挂网店，要拍得好看、不要拍得下流，{价}。', scene: '成人用品店打烊以后，店长把新到的玩具一样样摆上柜台讲卖点：要拍得像化妆品广告，又得让人一眼看懂是干什么用的。', bio: '下北泽成人用品店的店长，三十多岁，讲起产品像讲护肤品；最烦别人拿她的店开玩笑。' },
+    { who: '唯粉博主', job: '唯粉博主代拍一组', where: '她包下的海边民宿', fee: [10000, 25000], text: '唯粉博主：后台订阅掉了两成，想找专业的给我拍一组，海边民宿我包好了，{价}。', scene: '海边民宿里，唯粉博主带了三套衣服和一箱补光灯，要一组比平时自拍「贵」的片子；拍到一半，她开始低头刷后台数据。', bio: '做了三年唯粉的博主，自拍自剪，订阅最近在掉；想升级，又舍不得分成。' },
+    { who: '公会运营', job: '主播擦边短视频', where: '直播公会的样板间', fee: [6000, 12000], text: '公会运营：公会五个主播，一人拍三条擦边短视频，平台审得严，尺度得卡在线上，{价}。', scene: '直播公会的样板间里，五个主播排队补妆，运营举着平台的审核规则一条条念：哪里能露、哪里得挡、几秒内必须上字幕。', bio: '直播公会的运营，手里同时盯着十几个主播的数据；按条数结钱，最怕视频被平台限流。' },
+    { who: '鼎盛的制片', job: '借二号棚和柯大河补拍一天', where: '二号棚', fee: [20000, 40000], text: '鼎盛的制片：我们一部片少两个镜头，想借你们二号棚和那个掌机的小柯补拍一天，{价}，演员我们自己带。', scene: '鼎盛映像的制片带着自家的女优和男优进了二号棚，片子缺两个镜头；他们的导演看了柯大河打的光，开始打听能不能把他借走一个月。', bio: '鼎盛映像的执行制片，赶工期赶出了名；是对家，但出钱爽快，也爱挖人。' },
+    { who: '旅馆女将', job: '温泉旅馆宣传片', where: '箱根的老温泉旅馆', fee: [12000, 25000], text: '旅馆女将：旅馆想拍一支宣传片，露天风吕、怀石料理、浴衣，要拍得让人想住一晚，{价}，食宿我们包。', scene: '老字号温泉旅馆，女将穿着和服领着看露天风吕和客房；她要的宣传片「有一点点色气，但别让熟客看出来」。', bio: '老温泉旅馆的第三代女将，客人越来越少；想拍点年轻人爱看的，又怕老客人不高兴。' },
+    { who: 'coser', job: 'coser 私拍', where: '租来的白棚', fee: [6000, 15000], text: 'coser：漫展前想拍一组私拍，角色和服装都备好了，要拍得比漫展摄影好，{价}。', scene: '租来的白棚里，coser 把假发和道具摆了一地，一套角色服三层；她要的私拍介于写真和本子封面之间，分镜自己画好了。', bio: '圈里有名的 coser，漫展上排队合影的人很多；私拍只卖熟客，对角色还原挑得要命。' },
+    { who: '婚礼策划', job: '「新婚夜」纪念片', where: '婚礼酒店的套房', fee: [10000, 20000], text: '婚礼策划：有对新人想要一支只给他们俩看的「新婚夜」纪念片，套房订好了，{价}，保密协议签三份。', scene: '婚礼散场后的酒店套房，婚礼策划把保密协议摊在床上让每个人签；新娘还穿着婚纱，新郎紧张得一直在倒水。', bio: '婚礼策划公司的金牌策划，什么怪要求都接过；最在乎保密和准点。' },
+    { who: '健身房老板', job: '健身房招会员广告', where: '深夜的二十四小时健身房', fee: [8000, 15000], text: '健身房老板：想拍一支招会员的广告，教练们身材都练好了，要拍得像你们片子那样让人挪不开眼，{价}。', scene: '深夜没人的健身房，教练们抹好油在器械前摆姿势；老板要「出汗的特写」，又反复叮嘱别拍成你们那种片子。', bio: '前健美选手开的健身房；嘴上说要正经广告，看样片时最先问能不能再露一点。' },
+    { who: '写真杂志编辑', job: '写真杂志救场', where: '杂志社的摄影棚', fee: [12000, 25000], text: '写真杂志编辑：下期封面的摄影师跑了，能不能来救个场，模特和场地都定好了，{价}。', scene: '杂志社摄影棚里，编辑抱着上期样刊说她要「比上期大胆一点、比别家干净一点」；模特化好了妆在等，主编随时会进来看。', bio: '一本还在硬撑的写真杂志的编辑，销量年年掉；什么都想试，预算一直不够。' },
+    { who: '女仆店长', job: '女仆咖啡店宣传照和短视频', where: '秋叶原的女仆咖啡店', fee: [6000, 10000], text: '女仆店长：店里要换菜单照，顺便拍几条短视频，女仆们都很期待，{价}，拍完请吃蛋包饭。', scene: '秋叶原的女仆咖啡店，女仆们在蛋包饭上画爱心；店长要的短视频「可爱为主，但要让客人多点一杯」。', bio: '女仆咖啡的店长，入行前自己也是女仆；管得严，客人越线她第一个冲上去。' },
+    { who: '情人旅馆老板', job: '情人旅馆主题房宣传片', where: '郊外的情人旅馆', fee: [8000, 18000], text: '情人旅馆老板：新装了六间主题房，教室、电车、诊所都有，想拍一组宣传片挂网上，{价}。', scene: '郊外情人旅馆刚装修好的主题房，老板一间间开门介绍：电车房的拉环是真的，诊所房的床能调高度；他要每间都拍出「来过一次还想来」。', bio: '郊外情人旅馆的第二代老板，把旧旅馆改成了主题房；为装修借了钱，盼着网上的订单。' },
+    { who: '展会主办', job: '成人展会现场花絮', where: '成人展会的场馆', fee: [15000, 30000], text: '展会主办：周末的展会缺一组拍现场花絮的，女优签售、展台、观众都要，{价}，工作证我先寄过去。', scene: '成人展会的场馆里人挤人，各家展台的女优在签售；主办塞过来一张工作证，要一支「热闹，但拍不到观众的脸」的花絮。', bio: '办了十年成人展会的主办；最近展商越来越少、唯粉博主越来越多，他正发愁。' },
+    { who: '电影院老板', job: '老成人电影院闭馆短片', where: '月底关门的老成人电影院', fee: [6000, 12000], text: '电影院老板：我那家成人电影院月底关门，想请人拍一支短片留个念想，钱不多，{价}。', scene: '月底就关门的老成人电影院，放映机还在转，最后几位老客人坐在老位子上；老板想把这些都拍下来，说着说着讲起当年哪部片卖了满座。', bio: '开了三十年成人电影院的老头，录像带、光盘、下载都熬过来了，这回熬不过手机。' },
+  ],
+
   // ── 叮叮：员工表（按身份不同）。名字要和世界书条目【npc】×× 的 ×× 一字不差，叮叮会去读条目当人设 ──
   staffDir: [['戴晶', '社长'], ['邱德海', '老制片 · 你的师父'], ['尹椿', '恐怖片导演'], ['潘一树', '企划屋'], ['方正', '审查中心 · 审查员'], ['小满', '企划女优'], ['老钟', '男优部 · 老男优']],
   staffAct: [['戴晶', '社长'], ['老钟', '男优部 · 前辈'], ['邱德海', '老制片'], ['孟浪', '男优 · 同行'], ['黎夜', '男优 · 同行'], ['小满', '女优 · 老搭档']],
@@ -1455,6 +1476,41 @@ var PIANCHANG_CORE = (function () {
     return out.slice(0, n);
   }
   function parseCands(raw, cs) { var parts = splitBatch(raw, cs.length); return cs.map(function (c, i) { return parseCandOne(parts[i], c.surname); }); }
+  // ── 约来面试（v0.1.28，crazyman2333「加好友的女优能不能约来面试」）：叮叮里的人，名字定了；正文 / 叮叮 / 世界书里关于她的记录跟格子一起给 ──
+  //   跟记录对不上的格子照记录改：只放开年龄、外形、入行前、为什么来四格（XP、NG、尺度、特质照格子）；性别照记录，写了「男」脚本就不约
+  //   o：{ studio: 片商名, who: 玩家称呼（社长 / 导演） }；ev：{ story, chat, wb }（dingding.castEvidence）
+  var CAND_FROM_FMT = '性别|女 或 男（照记录写；记录里这个人是男的就写男，下面几行可以空着）\n年龄|数字（记录里写过就照记录，没写照格子）\n外形|一句（记录里写过长相就照记录，没写照格子）\n入行前|一句（记录里写过她做什么就照记录，没写照格子）\n为什么来|一句（她为什么肯来面试：接着记录里她和{U}的来往写）\n人话|一句话，30 字以内：她缺什么、想要什么\n自我介绍|两三句，她自己的口吻\n面试|{U}问「为什么来」，她答的一句\n';
+  var CAND_FROM_RETRY = '\n\n（上一次的格式没对上。这次每行一项，分别以 性别| 年龄| 外形| 入行前| 为什么来| 人话| 自我介绍| 面试| 开头。）';
+  function buildCandFromPrompt(c, ev, o) {
+    ev = ev || {}; o = o || {};
+    var U = o.who || '社长', studio = o.studio || L.studio || '银星映像', rec = [];
+    var sys = '你在帮片商「' + studio + '」补一位来面试的女优的档案（参考日本的架空世界，人名用中文名，全员成年）。她不是随机来的：' + U + '在正文里认识了她、在叮叮上加了好友，现在约她来面试，名字已经定了，叫「' + c.realName + '」。代码给她抽了一份档案格子，下面另附正文、叮叮和世界书里关于她的记录。' +
+      '记录里写过的事（年龄、长相、做什么的、经历、脾气、跟' + U + '的来往）以记录为准，格子跟记录对不上的那几格照记录改；记录没提到的，照格子写。';
+    if (ev.story) rec.push('【正文里写到她的段落】\n' + ev.story);
+    if (ev.chat) rec.push('【她和' + U + '在叮叮上的聊天】\n' + ev.chat);
+    if (ev.wb) rec.push('【世界书里她的条目】\n' + ev.wb);
+    var user = '【她的名字】' + c.realName + '（定了，照这个写）\n【抽到的档案格子】\n' + candLines(c).slice(1).join('\n') + '\n\n' +
+      (rec.length ? rec.join('\n\n') : '（正文和叮叮里关于她的记录很少：照格子写，名字照上面的。）') + '\n\n' +
+      '【请按这个格式回：每行一项，行首写项目名，用竖线隔开】\n' + CAND_FROM_FMT.replace(/\{U\}/g, U) + '\n' + CAND_RULES.replace(/- 档案里写着她是看了哪份招聘来的[^\n]*\n/, '') + '\n只输出这几行。';
+    return { sys: sys, user: user };
+  }
+  var FROM_KEY = { '性别': 'sex', '年龄': 'age', '外形': 'look', '入行前': 'past', '为什么来': 'motive', '人话': 'want', '本事': 'skill', '卡在哪': 'stuck', '自我介绍': 'intro', '面试': 'answer' };
+  var FROM_SKIP = /^[（(]?\s*(照格子|同格子|跟格子一样|不变|没写|无|空|—+|-+)\s*[）)]?$/;
+  function parseCandFrom(raw) {
+    var out = {}, last = null;
+    cleanRaw(raw).split('\n').forEach(function (line) {
+      var l = line.replace(/\*\*/g, '').replace(/^\s*(?:[-*•>]|\d+[.、)）])\s*/, '').trim(); if (!l) return;
+      var m = l.match(/^(性别|年龄|外形|入行前|为什么来|人话|本事|卡在哪|自我介绍|面试)\s*[|｜:：]\s*(.*)$/);
+      if (m) { last = FROM_KEY[m[1]]; out[last] = (out[last] ? out[last] + ' ' : '') + m[2].trim(); return; }
+      if (last && last !== 'sex' && last !== 'age') out[last] += ' ' + l;
+    });
+    var sex = String(out.sex || ''), male = /男/.test(sex) && !/女/.test(sex), age = Number((String(out.age || '').match(/\d{2}/) || [])[0]);
+    out.age = age >= 18 && age <= 60 ? age : 0;
+    ['look', 'past', 'motive'].forEach(function (k) { if (out[k] && FROM_SKIP.test(out[k].trim())) delete out[k]; });
+    if (out.want) out.want = oneLine(out.want);
+    var miss = ['want', 'intro'].filter(function (k) { return !out[k]; });
+    return { ok: !male && !miss.length, male: male, data: out, miss: miss };
+  }
   // 档案（给正文、叮叮、试戏用）
   function personLines(p) {
     var g = p.gen || {};
@@ -1607,7 +1663,7 @@ var PIANCHANG_CORE = (function () {
     parseScript: parseScript, parseScene: parseScene, mergeScene: mergeScene, scriptSane: scriptSane, pickMishapScene: pickMishapScene, parseRoles: parseRoles, scriptAllText: scriptAllText, makeIdea: makeIdea, ideaEmpty: ideaEmpty, ideaText: ideaText, ideaLineup: ideaLineup, ideaTier: ideaTier, applyIdea: applyIdea, ideaUnused: ideaUnused, markIdea: markIdea, lineCore: lineCore, cleanRaw: cleanRaw, sgFailKind: sgFailKind, failText: failText,
     markPlayer: markPlayer, castLine: castLine, shootPrompt: shootPrompt, softPose: softPose, softLines: softLines, doneLine: doneLine, statusPrompt: statusPrompt, parseStatus: parseStatus,
     PORTRAIT_N: PORTRAIT_N, PORTRAIT_BASE: PORTRAIT_BASE, portraitOk: portraitOk, portraitUrl: portraitUrl, pickPortrait: pickPortrait, fillPortraits: fillPortraits,
-    drawCand: drawCand, drawCands: drawCands, drawTraits: drawTraits, drawSpice: drawSpice, spicePool: spicePool, drawLook: drawLook, portraitFit: portraitFit, pickPortraitFor: pickPortraitFor, reqOfText: reqOfText, archOf: archOf, NC_LAYERS: NC_LAYERS, NC_KEYS: NC_KEYS, NC_LABEL: NC_LABEL, ncLines: ncLines, candLines: candLines, npcFaces: npcFaces, drawXP: drawXP, drawNG: drawNG, filmFee: filmFee, buildCandPrompt: buildCandPrompt, CAND_RETRY: CAND_RETRY, parseCands: parseCands, parseCandOne: parseCandOne, personLines: personLines,
+    drawCand: drawCand, drawCands: drawCands, drawTraits: drawTraits, drawSpice: drawSpice, spicePool: spicePool, drawLook: drawLook, portraitFit: portraitFit, pickPortraitFor: pickPortraitFor, reqOfText: reqOfText, archOf: archOf, NC_LAYERS: NC_LAYERS, NC_KEYS: NC_KEYS, NC_LABEL: NC_LABEL, ncLines: ncLines, candLines: candLines, npcFaces: npcFaces, drawXP: drawXP, drawNG: drawNG, filmFee: filmFee, buildCandPrompt: buildCandPrompt, CAND_RETRY: CAND_RETRY, parseCands: parseCands, buildCandFromPrompt: buildCandFromPrompt, parseCandFrom: parseCandFrom, CAND_FROM_RETRY: CAND_FROM_RETRY, parseCandOne: parseCandOne, personLines: personLines,
     buildTakePrompt: buildTakePrompt, parseTake: parseTake,
     finishChance: finishChance, rollFinish: rollFinish, bedCost: bedCost, REST: REST, pillGain: pillGain, pillRisk: pillRisk, gigPay: gigPay,
     filmScore: filmScore, monthCopies: monthCopies, marketBoard: marketBoard, actorBoard: actorBoard,
@@ -3253,14 +3309,15 @@ var PIANCHANG_DD = (function () {
       var id = 't_' + r.id; if (out.some(function (c) { return c.id === id; })) return;
       out.push({ id: id, name: r.name || r.stageName || r.realName || id, sub: r.sub || '', kind: r.kind === 'met' ? 'met' : 'talent', ref: r });
     });
+    var moved = {}; Object.keys(d.added || {}).forEach(function (id) { var a = d.added[id]; if (a && a.moved && out.some(function (c) { return c.id === a.moved; })) moved[id] = 1; });   // v0.1.28：签下叮叮约来的人以后，原来那条会话接到卡司那条上，这一条藏起来
     Object.keys(d.added || {}).forEach(function (id) {
-      if (out.some(function (c) { return c.id === id; })) return;
+      if (moved[id] || out.some(function (c) { return c.id === id; })) return;
       var a = d.added[id] || {};
       var r = a.kind === 'met' ? (s.met || []).find(function (x) { return x && 't_' + x.id === id; }) : null;
       out.push({ id: id, name: a.name || (r && (r.name || r.stageName || r.realName)) || id, sub: a.kind === 'met' ? '见过 · 小柯给的联系方式' : (a.sub || '小柯给的联系方式'), kind: r ? 'met' : a.kind === 'visitor' ? 'visitor' : 'free', ref: r || null });   // v0.1.27：正文里加了叮叮的人也记在 added（kind: 'visitor'）
     });
     Object.keys(d.h || {}).forEach(function (id) {   // 主动找上门的圈里人
-      if (id.indexOf('n_') !== 0 || !(d.h[id] || []).length || out.some(function (c) { return c.id === id; })) return;   // v0.1.27：重 roll 收回以后只剩空记录的，不算
+      if (id.indexOf('n_') !== 0 || moved[id] || !(d.h[id] || []).length || out.some(function (c) { return c.id === id; })) return;   // v0.1.27：重 roll 收回以后只剩空记录的，不算
       var nm = id.slice(2), vis = Lx().visitors;
       out.push({ id: id, name: nm, sub: (vis && vis[nm]) ? '圈里的人' : '找过你的人', kind: 'visitor' });
     });
@@ -3539,6 +3596,21 @@ var PIANCHANG_DD = (function () {
   }
   function ddText(s) { var h = dd(s).h || {}; return Object.keys(h).map(function (id) { return (h[id] || []).map(function (m) { return (m && (m.text || m.note)) || ''; }).join('\n'); }).join('\n'); }
   async function seenText(s) { return (await storyText()) + '\n' + ddText(s); }
+  // v0.1.28（crazyman2333「加好友的女优能不能约来面试」）：约来面试时交给编剧的记录——正文里写到这个人的几截（最近 40 楼，名字前后各一截，越近越先收，合起来 1500 字以内）、叮叮聊天、世界书条目
+  async function castEvidence(c) {
+    var s = st(), names = namesOf(c).filter(function (n) { return n && String(n).length >= 2; }), story = await storyText(), pos = [], spans = [], tot = 0;
+    names.forEach(function (n) { var i = -1; while ((i = story.indexOf(n, i + 1)) >= 0) pos.push(i); });
+    pos.sort(function (a, b) { return b - a; }).forEach(function (p) {
+      if (tot >= 1500) return;
+      var a = Math.max(0, p - 150), b = Math.min(story.length, p + 250), hit = spans.find(function (x) { return a <= x[1] && b >= x[0]; });
+      if (hit) { tot -= hit[1] - hit[0]; hit[0] = Math.min(hit[0], a); hit[1] = Math.max(hit[1], b); tot += hit[1] - hit[0]; } else { spans.push([a, b]); tot += b - a; }
+    });
+    var cut = spans.sort(function (x, y) { return x[0] - y[0]; }).map(function (x) { return story.slice(x[0], x[1]).replace(/\s*\n\s*/g, ' ').trim(); }).join('\n……\n');
+    if (cut.length > 1500) cut = '…' + cut.slice(-1500);
+    var chat = histText(hist(c.id, s).filter(function (m) { return m.kind !== 'invite'; }), 30, uc(s)); if (chat.length > 800) chat = '…' + chat.slice(-800);
+    var wb = await wbNpc(namesOf(c)); if (wb.length > 1500) wb = wb.slice(0, 1500) + '…';
+    return { story: cut, chat: chat, wb: wb };
+  }
   // 最新一条 AI 楼的正文（洗过），判断谁「在场」用
   async function floorText(mesId) {
     try { var ms = await getChatMessages(String(mesId)); var m = ms && ms[0]; return m && m.role === 'assistant' ? washFloor(m.message) : ''; } catch (e) { return ''; }
@@ -3906,6 +3978,9 @@ var PIANCHANG_DD = (function () {
     R + ' .dd-go{height:38px;border-radius:10px;border:0;cursor:pointer;font:inherit;font-size:14px;color:var(--dd-on);background:var(--dd);}',
     R + ' .dd-go.tf{background:#e8833a;color:#fff;}',
     R + ' .dd-tip{font-size:11.5px;color:var(--pc-faint);}',
+    R + ' .dd-castbar{flex:none;display:flex;align-items:center;gap:8px;padding:6px 16px;border-bottom:1px solid var(--pc-line);background:var(--dd-soft);font-size:12.5px;color:var(--pc-sub);}',
+    R + ' .dd-castbar span{flex:1;min-width:0;}',
+    R + ' .dd-castbar button{flex:none;border:1px solid var(--dd);background:var(--dd);color:var(--dd-on);border-radius:8px;padding:4px 10px;font:inherit;font-size:12.5px;font-weight:600;cursor:pointer;}',
     // 📞 通话屏（好大鱼老师《霖州》的样子：暗底、玻璃字幕、圆键）
     R + ' .dd-call{position:absolute;inset:0;z-index:5;display:flex;flex-direction:column;background:radial-gradient(120% 90% at 50% 0%,#3a3128,#14110e 70%);color:#fff;}',
     R + ' .dd-call .cb{flex:1;min-height:0;display:flex;flex-direction:column;padding:28px 18px 22px;position:relative;}',
@@ -4107,6 +4182,12 @@ var PIANCHANG_DD = (function () {
     ROOT.innerHTML = h + '</div>';
     rendered();
   }
+  // v0.1.28（crazyman2333「加好友的女优能不能约来面试」）：导演、社长线，叮叮里不是员工、没签约的人，头部底下一条「约来面试」；约过了、还在面试间的，换成「去选角看看」。能不能约由主脚本说了算（C.castInfo）
+  function castBar(c, s) {
+    var ci = null; try { ci = !c.group && C.castInfo ? C.castInfo(c, s) : null; } catch (e) { ci = null; }
+    if (!ci) return '';
+    return '<div class="dd-castbar" data-castbar="' + esc(c.id) + '"><span>' + (ci.pend ? esc(c.name) + ' 在面试间等着，签不签在选角页谈' : (c.kind === 'met' ? '面试过、还没签。' : '想签？') + '约来面试，签不签在选角页谈') + '</span><button data-x="castin">' + (ci.pend ? '去选角看看' : '📋 约来面试') + '</button></div>';
+  }
   function renderChat(id) {
     var s = st(), c = findChat(id, s);
     if (!c) return show('home');
@@ -4116,7 +4197,7 @@ var PIANCHANG_DD = (function () {
         (!c.group && C.faceTap ? '<button class="dd-hav" data-x="face" title="' + (kindOf(c) === 'talent' ? '看档案 / 换头像' : '换头像') + '">' + avatarOf(c).replace('dd-av', 'dd-av sm') + '</button>' : '') +   // v0.1.8：点头像换头像（签约的、借来过的女优打开档案）
         '<h2>' + esc(c.name) + '<small>' + (!c.group && blockedOf(id, s) ? '<span class="dd-blk">⛔ 已把你拉黑</span>' : esc(c.group ? (c.members.length + 1) + ' 人 · ' + c.members.join('、') : (c.sub || ''))) + '</small></h2>' +
         (canCall ? '<button class="dd-ib" data-x="call" data-m="audio" title="语音通话">' + ICO.call + '</button><button class="dd-ib" data-x="call" data-m="video" title="视频通话">' + ICO.vcall + '</button>' : '') +
-        '<button class="dd-ib" data-x="reroll" title="重新生成对方最近一轮">' + ICO.reroll + '</button></div>' +
+        '<button class="dd-ib" data-x="reroll" title="重新生成对方最近一轮">' + ICO.reroll + '</button></div>' + castBar(c, s) +
       '<div class="dd-chat" id="' + NS + '-chat"></div>' +
       '<div class="dd-tray" id="' + NS + '-stk"><div class="dd-grid">' + STICKER_NAMES.map(function (nm) { return '<button class="dd-cell" data-x="stk" data-n="' + esc(nm) + '" title="' + esc(nm) + '">' + stickerImg(nm) + '</button>'; }).join('') + '</div></div>' +
       '<div class="dd-tray" id="' + NS + '-more">' +
@@ -4175,14 +4256,15 @@ var PIANCHANG_DD = (function () {
     var v = (s.invites || []).find(function (x) { return x && x.id === m.inv; });
     if (!v) return '';
     var head = '<b>📅 ' + esc(C.mdShort(v.day)) + ' · ' + esc(v.where || '') + '</b>';
+    var job = v.job ? '<div class="dd-tip">外包：' + esc(v.job) + ' · 💴 ' + esc(C.moneyText ? C.moneyText(v.fee) : String(v.fee)) + (v.paid ? '（结了）' : '（说好的价，去了第二天结）') + '</div>' : '';   // v0.1.28（crazyman2333「社长线缺钱」）外包：卡上写着价
     if (v.status === 'pending') {
       var today = Number(v.day) === Number(s.day);
-      return '<div class="dd-inv">' + head + '<div class="row"><button data-x="inv" data-a="accept" data-id="' + esc(v.id) + '">接受</button>' +
+      return '<div class="dd-inv">' + head + job + '<div class="row"><button data-x="inv" data-a="accept" data-id="' + esc(v.id) + '">接受</button>' +
         (today ? '<button class="pri" data-x="inv" data-a="go" data-id="' + esc(v.id) + '">现在就去</button>' : '') +
         '<button data-x="inv" data-a="ignore" data-id="' + esc(v.id) + '">忽略</button></div></div>';
     }
     var lab = { accepted: '已接受', went: '去过了', ignored: '没理', missed: '没回', declined: '推掉了' }[v.status] || v.status;
-    return '<div class="dd-inv">' + head + ' · ' + esc(lab) + (v.status === 'accepted' && Number(v.day) === Number(s.day) ? '<div class="row"><button class="pri" data-x="inv" data-a="go" data-id="' + esc(v.id) + '">现在就去</button></div>' : '') + '</div>';
+    return '<div class="dd-inv">' + head + ' · ' + esc(lab) + job + (v.status === 'accepted' && Number(v.day) === Number(s.day) ? '<div class="row"><button class="pri" data-x="inv" data-a="go" data-id="' + esc(v.id) + '">现在就去</button></div>' : '') + '</div>';
   }
   function showTyping() { var a = $('chat'); if (a) { a.insertAdjacentHTML('beforeend', '<div class="dd-typing" id="' + NS + '-typing"><i></i><i></i><i></i></div>'); a.scrollTop = a.scrollHeight; } }
   function hideTyping() { var t = $('typing'); if (t) t.remove(); }
@@ -4923,15 +5005,17 @@ var PIANCHANG_DD = (function () {
       return await replyBatch([pick.id], false, { initiate: true, bg: true, reason: why });
     } finally { _bgBusy = false; }
   }
-  function onMainReceived(mesId, type) {
-    if (!C || SKIP_TYPES[type]) return Promise.resolve();
+  // after（v0.1.28）：主脚本记这一楼的存档点，排在 floorScan 后面（同一条 floorQ 上）；这一楼叮叮不读也照排
+  function onMainReceived(mesId, type, after) {
+    var tail = function () { if (typeof after === 'function' && C && C.floorQ) C.floorQ(after); };
+    if (!C || SKIP_TYPES[type]) { tail(); return Promise.resolve(); }
     var key = String(mesId) + '|' + (type || 'normal');
-    if (_floorSeen[key] && Date.now() - _floorSeen[key] < 3000) return Promise.resolve();   // 自己挂的监听和主脚本转来的同一楼只算一次
+    if (C.hookMain !== false && _floorSeen[key] && Date.now() - _floorSeen[key] < 3000) { tail(); return Promise.resolve(); }   // 自己挂的监听和主脚本转来的同一楼只算一次（v0.1.28：只有自己也挂了监听才查；主脚本转来的，重抽退回存档点以后同一楼会当新楼再来一次）
     _floorSeen[key] = Date.now();
     return new Promise(function (res) {
       setTimeout(function () {   // 让主脚本先把 [TIME] 读完（它排在同一条 floorQ 上）
         var n = 0;
-        C.floorQ(async function () { try { n = await floorScan(mesId, type); } catch (e) { try { console.warn('[叮叮] 读正文里的叮叮消息失败', e); } catch (e2) {} } })
+        C.floorQ(async function () { try { n = await floorScan(mesId, type); } catch (e) { try { console.warn('[叮叮] 读正文里的叮叮消息失败', e); } catch (e2) {} } if (typeof after === 'function') { try { await after(); } catch (e) {} } })
           .then(function () { return maybeAmbient(mesId, type, n > 0); })
           .catch(function (e) { try { console.warn('[叮叮] 主动来消息失败', e); } catch (e2) {} })
           .then(function () { res(); });
@@ -5060,6 +5144,7 @@ var PIANCHANG_DD = (function () {
     if (x === 'open') show('chat', id);
     else if (x === 'back') show('home');
     else if (x === 'face') { var fc = findChat(cur); if (fc && C.faceTap) C.faceTap(fc); }
+    else if (x === 'castin') { var cc = findChat(cur); if (cc && C.castIn) C.castIn(cc); }   // v0.1.28 约来面试
     else if (x === 'set') show('set');
     else if (x === 'set-tog') { var k = b.getAttribute('data-k'), o = {}; o[k] = cfg()[k] === false; saveCfg(o); renderSettings(); refreshInjection(); if (k === 'floor' && o[k]) startFloorObserver(); if (k === 'pretty') restyleFloor(); }
     else if (x === 'set-src') { saveCfg(Object.assign(readApiForm(), { source: b.getAttribute('data-v') })); renderSettings(); }
@@ -5148,7 +5233,8 @@ var PIANCHANG_DD = (function () {
   return {
     init: init, attach: attach, cleanup: cleanup, onChatChanged: onChatChanged, refreshInjection: refreshInjection, refresh: refreshView,
     pushInvite: pushInvite, markOldInvites: markOldInvites, addContact: addContact, norm: norm, unread: unreadTotal,
-    stripLog: stripLog, DDLOG_RE: DDLOG_RE, FENCE_RE: FENCE_RE, contacts: contacts, injText: injText,
+    stripLog: stripLog, DDLOG_RE: DDLOG_RE, FENCE_RE: FENCE_RE, contacts: contacts, injText: injText, castEvidence: castEvidence,
+    busy: function () { return !!(generating || _call); },   // v0.1.28：玩家发的消息正在等回 / 正在通话（主脚本的楼层存档点算「动过」）
     notifyEvent: notifyEvent, onMainReceived: onMainReceived, os: { contacts: osContacts, contact: osContact, current: osCurrent, openByName: openByName }, gen: gen, apiCfg: customApi, ttsOn: ttsOn, speak: speak, stopVoice: stopVoice, renderFloorBubbles: renderFloorBubbles, floorTheme: floorTheme, APP: APP,
     _t: { splitBatch: splitBatch, batchPrompt: batchPrompt, parsePrivate: parsePrivate, parseGroup: parseGroup, parseNpcLine: parseNpcLine, parseCallText: parseCallText, inviteChatId: inviteChatId, resolveSticker: resolveSticker, privatePrompt: privatePrompt, groupPrompt: groupPrompt, groups: groups, findChat: findChat, view: function () { return view; },
       fenceRows: fenceRows, splitTail: splitTail, parseBubs: parseBubs, floorScan: floorScan, maybeAmbient: maybeAmbient, washFloor: washFloor, ttsSegs: ttsSegs, fishOf: fishOf, cfg: cfg, saveCfg: saveCfg, phoneRule: phoneRule, AMB: AMB, onPromptReady: onPromptReady, flushN: function () { return _flushN; }, genCount: function () { return _genCount; } },
@@ -6797,16 +6883,23 @@ var PIANCHANG_ONLINE = (function () {
     return out;
   }
   var _q = Promise.resolve();
+  // v0.1.28（crazyman2333「脚本更新的东西没法撤回」）：每存一次 rev +1（只增不减，撤回也不退）；面板 / 叮叮里动过存档（TOUCH_AT）或者玩家点的生成还在跑（rbBusy），顺手记进 touchAt —— 楼层存档点拿它判断「之后动没动过」
+  var TOUCH_AT = 0;
   function save(fn) {
     _q = _q.then(function () {
-      return updateVariablesWith(function (v) { v[VAR_KEY] = normState(v[VAR_KEY]); fn(v[VAR_KEY]); return v; }, { type: 'chat' });
+      return updateVariablesWith(function (v) {
+        v[VAR_KEY] = normState(v[VAR_KEY]); var s = v[VAR_KEY]; fn(s);
+        if (identity(s)) { s.rev = (Number(s.rev) || 0) + 1; var tc = Math.max(TOUCH_AT, rbBusy() ? Date.now() : 0); if (tc > (Number(s.touchAt) || 0)) s.touchAt = tc; }
+        return v;
+      }, { type: 'chat' });
     }).then(function () { afterSave(); }).catch(function (e) { toast('error', '存档没写进去：' + errMsg(e)); });
     return _q;
   }
   function addLedger(s, kind, amount, note) {
     amount = Math.round(Number(amount) || 0);
     s.money = Math.round((Number(s.money) || 0) + amount);
-    s.ledger.push({ day: s.day, kind: kind, amount: amount, note: String(note || '') });
+    s.lseq = (Number(s.lseq) || 0) + 1;   // v0.1.28：每笔账一个序号 q（只增不减）：撤回时认「存档点以后」联机进出的那几笔，照记回去
+    s.ledger.push({ day: s.day, kind: kind, amount: amount, note: String(note || ''), q: s.lseq });
     if (s.ledger.length > 200) s.ledger = s.ledger.slice(-200);
   }
   function addNews(s, text) {
@@ -7010,6 +7103,12 @@ var PIANCHANG_ONLINE = (function () {
     var target = (type === 'swipe') ? n : n + 1;   // 这次要写的是第几楼
     if (target === 1) injectOpening(k);
   }
+  // v0.1.28：重抽（swipe / regenerate）先看要不要退回上一个存档点，再挂注入（酒馆会等这个监听跑完才拼提示词，所以注入照退回以后的存档写）
+  //   最多等 4 秒：存档队列万一卡住，宁可这次不撤，也别把生成堵死
+  async function beforeGen(type, opt, dryRun) {
+    if (!dryRun && RB_GEN[type || 'normal']) { GEN_ON = Date.now(); try { await Promise.race([rbBeforeGen(type || 'normal'), new Promise(function (r) { setTimeout(r, 4000); })]); } catch (e) { try { console.warn('[声色片场] 重抽前退存档点失败', e); } catch (e2) {} } }
+    onBeforeGen(type, opt, dryRun);
+  }
 
   // 【片场近况】每轮挂，深度 1，system；玩家看不见。剧情时间照纸醉金迷的 [TIME]：脚本读完就从楼层里擦掉
   function timeAsk(st) {
@@ -7044,7 +7143,10 @@ var PIANCHANG_ONLINE = (function () {
       if (pulled.length) a.push('被审查中心抽查下架、等重剪的：' + pulled.map(function (f) { return '《' + f.title + '》（' + (f.pullWhy || '') + '）'; }).join('、'));
     }
     var pend = st.invites.filter(function (v) { return (v.status === 'pending' || v.status === 'accepted') && Number(v.day) === Number(st.day); });
-    if (pend.length) a.push('今天约了：' + pend.map(function (v) { return v.by + '（' + v.where + '）'; }).join('、'));
+    if (pend.length) a.push('今天约了：' + pend.map(function (v) { return v.by + '（' + v.where + (v.job ? '，外包：' + v.job + '，说好 ' + money(v.fee) : '') + '）'; }).join('、'));
+    var jobs = st.invites.filter(function (v) { return v.job && v.status === 'went' && !v.paid && Number(v.day) === Number(st.day); });   // v0.1.28：外包那一场只挂一轮，后面几轮靠这一行记着价
+    if (jobs.length) a.push('今天在接的外包：' + jobs.map(function (v) { return v.by + '的' + v.job + '（' + v.where + '，说好 ' + money(v.fee) + '，明天结款）'; }).join('、'));
+    if (jobs.length || pend.some(function (v) { return v.job; })) paid = true;   // 外包的价也是面板定的
     news = news || st.news;
     if (news && news.length) a.push('刚才：' + news.map(function (e) { return e.t; }).join('；'));
     if (paid) a.push('钱都由面板结算：正文里有人谈片酬、价钱，就照上面这几个数说，不用另报一个价。');
@@ -7360,7 +7462,8 @@ var PIANCHANG_ONLINE = (function () {
       var fresh = quiet && C.rndFloat() < 0.6 ? [] : drawOffers(s, 1 + (C.rndFloat() < 0.5 ? 1 : 0));
       if (fresh.length && !quiet) out.push('📨 新片约 ' + fresh.length + ' 个');
     }
-    s.invites.forEach(function (v) { if ((v.status === 'pending' || v.status === 'accepted') && v.day < d) v.status = v.status === 'pending' ? 'missed' : 'went'; });
+    payJobs(s, out);   // v0.1.28：去过的外包结款
+    s.invites.forEach(function (v) { if ((v.status === 'pending' || v.status === 'accepted') && v.day < d) v.status = v.status === 'pending' || v.job ? 'missed' : 'went'; });   // 外包答应了没去 = 没去（不结款）
     s.invites = s.invites.filter(function (v) { return d - v.day < 30; });
     if (!quiet) drawInvites(s);   // 一口气跳好几天：中间那几天不约人，免得叮叮一下子涌进一堆
     return out;
@@ -7423,8 +7526,29 @@ var PIANCHANG_ONLINE = (function () {
       s.invites.push(v); out.push(v);
       if (DD) try { DD.pushInvite(s, v); } catch (e) {}
     });
+    var job = drawJob(s); if (job) out.push(job);
     if (s.invites.length > INV_CAP) s.invites = s.invites.slice(-INV_CAP);
     return out;
+  }
+  // ── 外包（v0.1.28（crazyman2333「社长线缺钱」）：社长才有；跟邀约一起掷，账上越紧越勤，一次只挂一单。邀约上多 job（干什么）、fee（说好的价）；去了的第二天结款，没去的跟别的邀约一样过期）──
+  (L.outsource || []).forEach(function (t) { if (t && t.bio && L.visitors && !L.visitors[t.who]) L.visitors[t.who] = t.bio; });   // 叮叮里跟找上门的人聊：人设照 bio
+  function jobChance(m) { m = Number(m) || 0; return m < 50000 ? 0.5 : m < 150000 ? 0.3 : 0.12; }
+  function jobOpen(s) { return arr(s.invites).some(function (v) { return v && v.job && (v.status === 'pending' || v.status === 'accepted') && Number(v.day) >= Number(s.day); }); }
+  function drawJob(s) {
+    var pool = arr(L.outsource); if (identity(s) !== '社长' || !pool.length || jobOpen(s) || C.rndFloat() >= jobChance(s.money)) return null;
+    var last = arr(s.invites).filter(function (v) { return v && v.job; }).slice(-3).map(function (v) { return v.by; }), fresh = pool.filter(function (t) { return last.indexOf(t.who) < 0; });
+    var t = C.pick(fresh.length ? fresh : pool), f = arr(t.fee).length === 2 ? t.fee : [6000, 12000], fee = Math.round((f[0] + C.rndFloat() * (f[1] - f[0])) / 500) * 500;
+    var v = { id: C.uid('v'), by: t.who, day: s.day + (C.rndFloat() < 0.5 ? 0 : 1 + C.randInt(2)), recvDay: s.day, status: 'pending', where: t.where, job: t.job, fee: fee, text: String(t.text || '').replace('{价}', money(fee)), scene: t.scene };
+    s.invites.push(v); if (DD) try { DD.pushInvite(s, v); } catch (e) {}
+    return v;
+  }
+  // 去过的外包第二天结款（rollDay 里调）：钱只从这里进账，正文里谈多少都不算
+  function payJobs(s, out) {
+    s.invites.forEach(function (v) {
+      if (!v || !v.job || v.status !== 'went' || v.paid || !(Number(v.day) < Number(s.day))) return;
+      v.paid = s.day; addLedger(s, 'outsource', Number(v.fee) || 0, '外包结款：' + v.by + '的' + v.job);
+      out.push('💴 外包结款 ' + money(v.fee) + '：' + v.by + '的' + v.job);
+    });
   }
   var PING_SKIP = { swipe: 1, regenerate: 1, 'continue': 1, impersonate: 1, quiet: 1, first_message: 1 };
   function maybePing(type) {
@@ -7442,13 +7566,20 @@ var PIANCHANG_ONLINE = (function () {
   function inviteSceneText(v, st) {
     var id = identity(st);
     var role = id === '社长' ? '「' + (coName(st) || '新公司') + '」的社长' : id === '导演' ? '银星的导演' : '银星的男优';
+    if (v.job) return jobSceneText(v, st, role);
     return '【片场 · 赴约】' + C.mdText(st.day) + '，{{user}}（' + role + '）去了' + v.where + '：' + v.by + '约的。' + (v.scene || '') + '\n这一段正文让' + v.by + '当主角；一场里有名有姓的人不超过三个。{{user}} 的话和决定留给 {{user}}。';
+  }
+  // v0.1.28（crazyman2333「社长线缺钱」）：外包那一场。钱数是脚本定的、已经谈好，正文照着说；结款归面板（第二天进账）
+  function jobSceneText(v, st, role) {
+    return '【片场 · 外包】' + C.mdText(st.day) + '，{{user}}（' + role + '）接了一单外包：' + v.by + '找的活，' + v.job + '，在' + v.where + '。柯大河扛着机器跟着。' + (v.scene || '') +
+      '\n价钱已经谈好了：' + money(v.fee) + '，交片以后对方照这个数结，脚本第二天记进公司账上。正文里谈到钱就照这个数说，这一段写活怎么干、人怎么相处。' +
+      '\n这一段正文让' + v.by + '当主角；一场里有名有姓的人不超过三个。{{user}} 的话和决定留给 {{user}}。';
   }
   async function goInvite(id) {
     var st = readState(), v = st.invites.find(function (x) { return x.id === id; });
     if (!v) return;
-    await save(function (s) { var x = s.invites.find(function (y) { return y.id === id; }); if (x) x.status = 'went'; addNews(s, '去' + v.where + '赴' + v.by + '的约'); });
-    await setScene('invite', v.by, inviteSceneText(v, st), '（去' + v.where + '找' + v.by + '）', v.by + ' 在' + v.where + '等你，去正文吧');
+    await save(function (s) { var x = s.invites.find(function (y) { return y.id === id; }); if (x) x.status = 'went'; addNews(s, v.job ? '去' + v.where + '接' + v.by + '的外包：' + v.job : '去' + v.where + '赴' + v.by + '的约'); });
+    await setScene(v.job ? 'job' : 'invite', v.by, inviteSceneText(v, st), '（去' + v.where + '找' + v.by + '）', v.by + ' 在' + v.where + '等你，' + (v.job ? '活干完第二天结款，' : '') + '去正文吧');
   }
   async function setInvStatus(id, status) {
     await save(function (s) { var v = s.invites.find(function (x) { return x.id === id; }); if (v) v.status = status; });
@@ -7921,13 +8052,14 @@ var PIANCHANG_ONLINE = (function () {
     }
     var used = st.dir.cast.map(function (c) { return (c.realName || '').charAt(0); });
     // 抽签池去重（v0.1.8）：这一批三个人不抽同一条；最近几批抽过的少抽（键存在 s.dir.ncSeen）
-    var drawn = C.drawCands(3, used, st.dir.cast.map(function (c) { return c.portrait; }), cr ? cr.reqs : null, [].concat.apply([], arr(st.dir.ncSeen)));
+    var keep = arr((curCasting(st) || {}).cands).filter(function (c) { return c && c.ddFrom && c.status !== 'loading'; });   // v0.1.28：叮叮约来的人不跟着这一批换掉
+    var drawn = C.drawCands(3, used, st.dir.cast.concat(keep).map(function (c) { return c.portrait; }), cr ? cr.reqs : null, [].concat.apply([], arr(st.dir.ncSeen)));
     var seenKeys = drawn.keys || [];
     if (seenKeys.length) save(function (s) { s.dir.ncSeen = arr(s.dir.ncSeen).concat([seenKeys]).slice(-(C.NC_RECENT || 4)); });
-    var mine = CUR = { busy: true, cands: drawn.map(function (c) { c.status = 'loading'; return c; }) };
+    var mine = CUR = { busy: true, cands: keep.concat(drawn.map(function (c) { c.status = 'loading'; return c; })) };
     if (cr) CUR.byScript = { sid: cr.reqs[0].forScript.sid, title: cr.sc.title, role: cr.reqs[0].forScript.role };
     render();
-    var pend = CUR.cands.slice(), why = '';
+    var pend = CUR.cands.filter(function (c) { return c.status === 'loading'; }), why = '';
     for (var attempt = 0; attempt < 2 && pend.length; attempt++) {
       var raw = null, err = null;
       try { raw = await genAsk(C.buildCandPrompt(pend), attempt ? C.CAND_RETRY : '', 'pianchang-cast-' + Date.now().toString(36) + attempt); } catch (e) { err = e; }
@@ -7945,6 +8077,7 @@ var PIANCHANG_ONLINE = (function () {
   function persistCasting() { var snap = CUR ? clone(CUR) : null; if (snap) snap.busy = false; return save(function (s) { s.dir.cands = snap; }); }
   async function retryCand(id) {
     var c = CUR && CUR.cands.find(function (x) { return x.id === id; }); if (!c || CUR.busy) return;
+    if (c.ddFrom) { var dc = ddContactOf(c, readState()); c.status = 'loading'; CUR.busy = true; render(); return genCandFrom(c, dc, CUR); }   // v0.1.28：叮叮约来的人照她自己的记录重写，名字不换
     var mine = CUR;
     c.status = 'loading'; CUR.busy = true; render();
     try { var raw = await genAsk(C.buildCandPrompt([c]), C.CAND_RETRY, 'pianchang-cast1-' + Date.now().toString(36)); if (CUR !== mine) return; var r = C.parseCands(raw, [c])[0]; if (r.ok) fillCand(c, r.data); else { c.status = 'error'; c.err = C.failText(C.sgFailKind(raw), '缺：' + r.miss.join('、')); } }
@@ -7969,11 +8102,87 @@ var PIANCHANG_ONLINE = (function () {
       addNews(s, '签下新人' + c.realName + '，艺名「' + stage + '」，明天（' + C.mdShort(s.day + LAW.signToShoot) + '）起就能进棚');
       s.met = s.met.filter(function (m) { return m.id !== c.id; });
       if (s.dd && s.dd.added) delete s.dd.added['t_' + c.id];   // 叮叮：从「面试过」变成卡司，同一条会话
+      if (s.dd && c.ddFrom && c.ddFrom !== 't_' + c.id) ddMove(s.dd, c.ddFrom, 't_' + c.id, c.realName);   // v0.1.28：叮叮约来的，原来那条会话接到卡司那条上
     });
     CUR.cands = CUR.cands.filter(function (x) { return x.id !== id; }); persistCasting();
     UI.modal = null; toast('success', '签下「' + stage + '」。明天（' + C.mdText(st.day + LAW.signToShoot) + '）起就能进棚' + (sheet.length ? '。' + sheet.join('；') + '（卡司页点「档案」看全）' : '')); render();
   }
+  // 叮叮会话搬家（签下叮叮约来的人）：拷一份到新会话，原来那条留着、标 moved 藏起来（不删：撤回到签约以前还接得回去）
+  function ddMove(dd, from, to, name) {
+    ['h', 'calls', 'bl'].forEach(function (k) { if (dd[k] && dd[k][from] && !(dd[k][to] && dd[k][to].length)) dd[k][to] = clone(dd[k][from]); });
+    ['u', 'q', 'f'].forEach(function (k) { if (dd[k] && dd[k][from] != null) { dd[k][to] = dd[k][from]; if (k !== 'f') dd[k][from] = 0; } });
+    dd.added = obj(dd.added); dd.added[from] = Object.assign({ name: name, kind: 'visitor' }, dd.added[from] || {}, { moved: to });
+  }
   async function passCand(id) { if (!CUR) return; CUR.cands = CUR.cands.filter(function (x) { return x.id !== id; }); await persistCasting(); render(); }
+  // ── 约来面试（v0.1.28，crazyman2333「加好友的女优能不能约来面试」）：叮叮里的人 → 选角页多一位候选人（加在这一批最前面，不换掉这一批、不花招聘费），签约照常走 ──
+  //   谁能约：导演、社长线；叮叮里「面试过的 / 小柯给的 / 正文里来的」人（世界书里有条目的也在这几类里）；员工、阮静、签着的、借来过的、银星自己的女优、男优、外包找上门的不约。一个人只挂一份
+  //   面试过的（s.met）：档案原样请回来，不花请求；别的：抽一份格子，名字定成她，正文 / 叮叮 / 世界书里关于她的记录一起交给编剧补（core.buildCandFromPrompt）；记录里是男的就不约
+  function curCasting(st) {
+    if (!CUR && st && st.dir && st.dir.cands && Array.isArray(st.dir.cands.cands)) { CUR = st.dir.cands; CUR.busy = false; CUR.cands.forEach(function (c) { if (c.status === 'loading') { c.status = 'error'; c.err = '上次没生成完'; } }); }
+    return CUR;
+  }
+  function castInfo(c, st) {
+    st = st || readState();
+    if (!c || c.group || !dirLike(identity(st)) || ['met', 'free', 'visitor'].indexOf(c.kind) < 0) return null;
+    var r = c.ref || null, names = [c.name].concat(r ? [r.realName, r.name, r.stageName] : []).map(function (x) { return String(x || '').trim(); }).filter(Boolean);
+    var hit = function (p) { return p && names.some(function (n) { return n === p.stageName || n === p.realName || n === p.name; }); };
+    if (!names.length || names.indexOf('柯大河') >= 0 || (L.banker && names.indexOf(L.banker.name) >= 0)) return null;
+    if (staffOf(st).some(function (x) { return names.indexOf(x[0]) >= 0; }) || st.dir.cast.some(hit) || arr(st.dir.alumni).some(hit) || L.cast0.some(hit) || L.actors.some(hit) || arr(L.outsource).some(function (t) { return names.indexOf(t.who) >= 0; })) return null;
+    var cur = curCasting(st), p = cur && cur.cands.find(function (x) { return x && (x.ddFrom === c.id || (r && x.id === r.id) || names.indexOf(x.realName) >= 0); });
+    return { pend: p ? p.id : '', met: c.kind === 'met' && r && r.id ? r.id : '' };
+  }
+  function ddContactOf(p, st) { var c = null; try { c = DD && DD.contacts ? DD.contacts(st).find(function (x) { return x.id === p.ddFrom; }) : null; } catch (e) {} return c || { id: p.ddFrom, name: p.realName, kind: 'free' }; }
+  function goCand(id) {
+    UI.tab = 'casting'; lsSet(TAB_KEY, UI.tab); UI.hlCand = id;
+    if (!PANEL.classList.contains('open')) openPanel(); else render();
+    setTimeout(function () { try { var el = PANEL.querySelector('[data-pc-card="cand"][data-id="' + id + '"]'); if (el && el.scrollIntoView) el.scrollIntoView({ block: 'nearest' }); } catch (e) {} }, 60);
+  }
+  async function castIn(c) {
+    var st = readState(), info = castInfo(c, st); if (!info) return;
+    if (info.pend) { goCand(info.pend); return; }
+    var cur = curCasting(st);
+    if (cur && cur.busy) { toast('info', '面试间正忙（这一批还在填表），等她们填完再约'); return; }
+    if (!cur) cur = CUR = { cands: [] };
+    var met = info.met && arr(st.met).find(function (m) { return m && m.id === info.met; });
+    if (met) {
+      var mp = clone(met); delete mp.metDay; delete mp.err; mp.status = 'ok'; mp.ddFrom = c.id;
+      cur.cands.unshift(mp); await persistCasting(); goCand(mp.id);
+      toast('success', (mp.realName || c.name) + ' 又来了一趟，在选角页等着：签不签照常谈'); return;
+    }
+    var nm = String(c.name || '').trim(), na = Array.from(nm), others = st.dir.cast.concat(cur.cands);
+    var d = C.drawCands(1, st.dir.cast.map(function (x) { return (x.realName || '').charAt(0); }), others.map(function (x) { return x.portrait; }), null, [].concat.apply([], arr(st.dir.ncSeen))), p = d[0];
+    if (d.keys && d.keys.length) save(function (s) { s.dir.ncSeen = arr(s.dir.ncSeen).concat([d.keys]).slice(-(C.NC_RECENT || 4)); });
+    p.surname = na[0] || ''; p.given = na.slice(1).join(''); p.realName = nm; p.ddFrom = c.id; p.status = 'loading';
+    cur.cands.unshift(p); cur.busy = true; goCand(p.id);
+    return genCandFrom(p, c, cur);
+  }
+  async function genCandFrom(p, c, mine) {
+    var st = readState(), ev = null, raw = null, err = null, r = null;
+    try { ev = DD && DD.castEvidence ? await DD.castEvidence(c) : null; } catch (e) { ev = null; }
+    for (var attempt = 0; attempt < 2; attempt++) {
+      err = null;
+      try { raw = await genAsk(C.buildCandFromPrompt(p, ev || {}, { studio: ourStudio(st), who: identity(st) || '社长' }), attempt ? C.CAND_FROM_RETRY : '', 'pianchang-castdd-' + Date.now().toString(36) + attempt); } catch (e) { err = e; }
+      if (CUR !== mine) return;   // 切了聊天
+      if (err && is429(err)) break;
+      r = err ? null : C.parseCandFrom(raw); if (r && (r.ok || r.male)) break;
+    }
+    mine.busy = false;
+    if (r && r.male) { mine.cands = mine.cands.filter(function (x) { return x !== p; }); if (UI.hlCand === p.id) UI.hlCand = null; await persistCasting(); render(); toast('warning', '选角只招女优：' + p.realName + ' 是男的，约不来面试'); return; }
+    if (r && r.ok) fillCandFrom(p, r.data, st, mine); else { p.status = 'error'; p.err = err ? errMsg(err) : C.failText(C.sgFailKind(raw), r ? '缺：' + r.miss.join('、') : ''); }
+    await persistCasting(); render();
+    if (p.status === 'ok') toast('success', p.realName + ' 来了，在选角页等着：签不签照常谈');
+  }
+  function fillCandFrom(p, d, st, mine) {
+    p.gen = { want: d.want || '', skill: d.skill || '', stuck: d.stuck || '', intro: d.intro || '', answer: d.answer || '' };
+    if (d.age && d.age !== p.age) p.age = d.age;
+    if (d.past) p.past = C.clip(d.past, 40);
+    if (d.motive) p.motive = C.clip(d.motive, 40);
+    if (d.look && d.look !== p.look) {   // 记录里写过长相：外形照记录，立绘照新外形重挑（同一套词，挑不准就挑不冲突的）
+      p.look = C.clip(d.look, 60); p.lookReq = C.reqOfText(p.look, p.age);
+      p.portrait = C.pickPortraitFor(p.lookReq, p.age, st.dir.cast.concat(mine.cands.filter(function (x) { return x !== p; })).map(function (x) { return x.portrait; }).concat(C.npcFaces()));
+    }
+    p.status = 'ok'; delete p.err;
+  }
   function interviewText(p, st) {
     var signed = !!p.stageName;
     var boss = identity(st) === '社长', firm = boss ? '「' + (coName(st) || '新公司') + '」' : '银星映像';
@@ -8674,6 +8883,7 @@ var PIANCHANG_ONLINE = (function () {
     // 候选人卡（照社长室 sh-talent）
     P + ' .pc-tgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;align-items:stretch;}',
     P + ' .pc-tal{background:var(--pc-card);border:1px solid var(--pc-line);border-radius:10px;overflow:hidden;display:flex;flex-direction:column;min-width:0;}',
+    P + ' .pc-tal.hl{border-color:var(--pc-amber);box-shadow:0 0 0 2px var(--pc-amber);}',   // v0.1.28：叮叮约来的那位
     P + ' .pc-photo{position:relative;height:150px;flex:none;background:repeating-linear-gradient(135deg,var(--pc-card2) 0 14px,var(--pc-input) 14px 28px);display:flex;align-items:center;justify-content:center;overflow:hidden;}',
     P + ' .pc-photo.has-img{height:300px;}',
     P + ' .pc-photo .ch{font-size:76px;font-weight:800;color:var(--pc-ink);opacity:.16;line-height:1;}',
@@ -9061,7 +9271,7 @@ var PIANCHANG_ONLINE = (function () {
     var today = v.day === st.day;
     var btns = v.status === 'pending' ? '<button class="btn sm" data-act="inv-accept" data-id="' + v.id + '">接受</button>' + (today ? '<button class="btn sm pri" data-act="inv-go" data-id="' + v.id + '">现在就去</button>' : '') + '<button class="btn sm" data-act="inv-ignore" data-id="' + v.id + '">忽略</button>'
       : v.status === 'accepted' && today ? '<button class="btn sm pri" data-act="inv-go" data-id="' + v.id + '">现在就去</button>' : '<span class="faint">' + ({ accepted: '已接受', went: '去过了', ignored: '没理', missed: '没回' }[v.status] || '') + '</span>';
-    return '<div class="card"><div class="faint">📅 ' + esc(C.mdText(v.day)) + ' · ' + esc(v.where) + '</div><div class="say">' + esc(v.text) + '</div><div class="row">' + btns + '</div></div>';
+    return '<div class="card"' + (v.job ? ' data-pc-job="' + esc(v.id) + '"' : '') + '><div class="faint">📅 ' + esc(C.mdText(v.day)) + ' · ' + esc(v.where) + (v.job ? ' · 外包：' + esc(v.job) + ' · 💴 ' + esc(money(v.fee)) + (v.paid ? '（结了）' : '（说好的价，去了第二天结）') : '') + '</div><div class="say">' + esc(v.text) + '</div><div class="row">' + btns + '</div></div>';
   }
   function eventCard(ev) {
     if (ev.kind === 'check') return '<div class="card warn"><div class="eb">审查中心 · 抽查</div><div style="margin:6px 0">' + esc(ev.text) + '</div><div class="row"><button class="btn sm" data-act="ev-talk" data-id="' + ev.id + '">去审查中心听方正说（正文）</button><button class="btn sm pri" data-act="ev-fix" data-id="' + ev.id + '">去重剪</button><button class="btn sm" data-act="ev-ok" data-id="' + ev.id + '">知道了</button></div></div>';
@@ -9138,10 +9348,11 @@ var PIANCHANG_ONLINE = (function () {
   function candCard(c, i) {
     var g = c.gen || {}, ok = c.status === 'ok';
     var h = photoTop(c, c.surname, 'No.' + String((i || 0) + 1).padStart(2, '0')) + '<div class="pc-tb">' +
-      '<h3 class="pc-name"><span class="rb">NEWCOMER' + (ok ? ' · 本名' : '') + '</span>' + esc(ok ? c.realName : c.surname + ' ……') + '<small>' + c.age + ' 岁 · ' + esc(c.hometown) + '</small></h3>' +
+      '<h3 class="pc-name"><span class="rb">NEWCOMER' + (ok ? ' · 本名' : '') + '</span>' + esc(ok || c.ddFrom ? c.realName : c.surname + ' ……') + '<small>' + c.age + ' 岁 · ' + esc(c.hometown) + '</small></h3>' +
       '<div class="pc-line">' + tierTag(c.tier) + '<span>' + esc(c.rankLabel) + ' · 一部 ' + esc(money(c.fee)) + ' · 签约金 ' + esc(money(c.signFee)) + '</span></div>' +
-      (c.forScript ? '<div class="pc-line"><span class="tag gr" data-pc-for="' + esc(c.forScript.sid || '') + '">冲《' + esc(c.forScript.title) + '》来的</span>' + (c.firstTime ? '<span class="tag">第一次进棚</span>' : '') + '</div>' : '');
-    if (c.status === 'loading') return '<article class="pc-tal" data-pc-card="cand" data-id="' + esc(c.id) + '">' + h + '<div class="busy" style="margin-top:12px">她在门口填表……</div></div></article>';
+      (c.forScript ? '<div class="pc-line"><span class="tag gr" data-pc-for="' + esc(c.forScript.sid || '') + '">冲《' + esc(c.forScript.title) + '》来的</span>' + (c.firstTime ? '<span class="tag">第一次进棚</span>' : '') + '</div>' : '') +
+      (c.ddFrom ? '<div class="pc-line"><span class="tag gr" data-pc-dd="' + esc(c.ddFrom) + '">叮叮约来的</span></div>' : '');   // v0.1.28
+    if (c.status === 'loading') return '<article class="pc-tal' + (UI.hlCand && UI.hlCand === c.id ? ' hl' : '') + '" data-pc-card="cand" data-id="' + esc(c.id) + '">' + h + '<div class="busy" style="margin-top:12px">她在门口填表……</div></div></article>';
     // 卡面只放最有戏的六层（一项一行）；其余几层进「请她进来聊聊」的人设。v0.1.5 以前的候选人没有抽签池那几层，照旧显示本事 / 卡在哪
     h += profRows(c.pool >= 2 ? [['外形', c.look], ['入行前', c.past], ['为什么来', c.motive], ['人话', g.want || c.need], ['卡在哪', c.stuck], ['面试那天', c.entrance]]
       : [['外形', c.look], ['入行前', c.past], ['为什么来', c.motive], ['人话', g.want], ['本事', g.skill], ['卡在哪', g.stuck]]) + personTags(c) +
@@ -9149,11 +9360,12 @@ var PIANCHANG_ONLINE = (function () {
     h += c.status === 'error'
       ? '<div class="err" style="margin-top:8px">' + esc(c.err || '没生成出来') + '</div><div class="pc-acts"><button class="btn sm" data-act="cand-retry" data-id="' + c.id + '">再试一次</button><button class="btn sm" data-act="cand-pass" data-id="' + c.id + '">不要了</button></div>'
       : '<div class="pc-acts"><button class="btn sm pri" data-act="cand-sign" data-id="' + c.id + '">签约 · 起艺名</button><button class="btn sm" data-act="cand-pass" data-id="' + c.id + '">不要</button><button class="btn sm wide" data-act="invite" data-id="' + c.id + '">请她进来聊聊</button></div>';
-    return '<article class="pc-tal" data-pc-card="cand" data-id="' + esc(c.id) + '">' + h + '</div></article>';
+    return '<article class="pc-tal' + (UI.hlCand && UI.hlCand === c.id ? ' hl' : '') + '" data-pc-card="cand" data-id="' + esc(c.id) + '">' + h + '</div></article>';
   }
   function renderCasting(st) {
+    curCasting(st);   // v0.1.28：撤回、刚读档时 CUR 还空着：从存档里接回这一批
     var h = '<div class="eb">CASTING</div><h2 class="h">选角 · 一次面三个新人</h2>' +
-      '<div class="sub" style="margin-bottom:12px">三份简历送到了：外形、经历、能接的尺度、XP 和 NG 都写在上面；名字、心里话、自我介绍，等她们进门自己说。签下来要起艺名，<b>签了第二天就能进棚</b>。</div>' +
+      '<div class="sub" style="margin-bottom:12px">三份简历送到了：外形、经历、能接的尺度、XP 和 NG 都写在上面；名字、心里话、自我介绍，等她们进门自己说。签下来要起艺名，<b>签了第二天就能进棚</b>。叮叮里加过的人，在她的聊天页点「📋 约来面试」也能请来。</div>' +
       '<div class="row" style="margin-bottom:14px"><button class="btn pri" data-act="cast-start"' + (CUR && CUR.busy ? ' disabled' : '') + '>' + (CUR && CUR.cands.length ? '再面三个' : '开始面试') + '</button>' +
       '<button class="btn" data-act="cast-script"' + (CUR && CUR.busy ? ' disabled' : '') + ' title="挑一部剧本、她的位子：按年龄、尺度、经历先筛一遍再来面试">📋 按剧本招（' + esc(money(E.adFee || 0)) + '）</button>' + (CUR && CUR.busy ? '<span class="busy">她们在门口填表……</span>' : '') + '</div>';
     if (CUR && CUR.byScript) h += '<div class="card hl" data-pc-byscript="' + esc(CUR.byScript.sid || '') + '"><div class="eb">按剧本招</div>这一批是看了招聘来的：《' + esc(CUR.byScript.title) + '》找「' + esc(CUR.byScript.role) + '」。签下来以后开机选角，这个位子默认填她。</div>';
@@ -9611,6 +9823,7 @@ var PIANCHANG_ONLINE = (function () {
     else if (ON && String(m.kind).indexOf('ol-') === 0) body = ON.modalHtml(st, m);
     else if (m.kind === 'settings') body = renderSettings(st, m);
     else if (m.kind === 'drop') body = '<div class="eb">CUT</div><h2 class="h">不拍了？</h2><div class="sub">这一部不拍完就收：已经花的钱回不来，' + (dirLike(identity(st)) ? '也不会出片。' : '片酬也没有。') + '</div><div class="act"><button class="btn" data-act="modal-x">接着拍</button><button class="btn red" data-act="sh-drop">收了</button></div>';
+    else if (m.kind === 'rollback') body = rbModalHtml(st, m);   // v0.1.28：删楼 / 换回旧那版，片场的账撤不撤
     return '<div class="pc-modal" data-act="modal-bg"><div class="pc-dialog' + (m.kind === 'settings' ? ' pc-set' : '') + '">' + body + '</div></div>';
   }
 
@@ -9814,6 +10027,7 @@ var PIANCHANG_ONLINE = (function () {
   // ── 点击 / 输入 ──
   // 捕获阶段先记一笔「这是用户在操作」：叮叮自己的点击（在面板里头，先于下面的委托跑）引起的重画也算
   ['click', 'change', 'input', 'keydown'].forEach(function (tn) { PANEL.addEventListener(tn, userAct, true); });
+  ['click', 'keydown'].forEach(function (tn) { PANEL.addEventListener(tn, touchAct, true); });   // v0.1.28：面板 / 叮叮里动了存档，记一笔时间（楼层存档点看「之后动没动过」）
   PANEL.addEventListener('focusin', focusIn, true);
   function ptrDown() { PTR_DOWN = true; }
   function ptrUp() { PTR_DOWN = false; }
@@ -9846,7 +10060,7 @@ var PIANCHANG_ONLINE = (function () {
     if (t.hasAttribute('data-day')) { UI.calSel = Number(t.getAttribute('data-day')) || null; render(); return; }
     var act = t.getAttribute('data-act'), id = t.getAttribute('data-id');
     if (UI.thOpen && act !== 'theme-set') { UI.thOpen = false; if (act === 'theme-close' || act === 'theme-open') { render(); return; } }
-    if (act === 'modal-bg') { if (e.target === t && UI.modal && UI.modal.kind !== 'finish') closeSettings(); return; }
+    if (act === 'modal-bg') { if (e.target === t && UI.modal && UI.modal.kind === 'rollback') rbAnswer(false); else if (e.target === t && UI.modal && UI.modal.kind !== 'finish') closeSettings(); return; }   // v0.1.28：撤不撤的弹框点外面 = 留着
     if (act && act.indexOf('face-') === 0) { faceClick(act, t, e); return; }   // 换头像 / 立绘那一层
     var st = readState();
     switch (act) {
@@ -9886,6 +10100,8 @@ var PIANCHANG_ONLINE = (function () {
       case 'endday': UI.modal = { kind: 'endday', n: 1 }; render(); break;
       case 'skip': UI.modal = { kind: 'endday', n: Math.max(1, Math.min(130, nextMark(st) - st.day)) }; render(); break;
       case 'endday-ok': { var n = Number(t.getAttribute('data-n')) || 1, ck = t.getAttribute('data-clock'); UI.modal = null; UI.calSel = null; UI.calOff = 0; endDays(n).then(function () { if (ck) save(function (s) { s.clock = ck; }).then(render); }); break; }
+      case 'rb-ok': rbAnswer(true); break;   // v0.1.28：删楼 / 换回旧那版 → 片场的账撤回
+      case 'rb-keep': rbAnswer(false); break;
       case 'inv-accept': setInvStatus(id, 'accepted'); break;
       case 'inv-ignore': setInvStatus(id, 'ignored'); break;
       case 'inv-go': goInvite(id); break;
@@ -10230,7 +10446,8 @@ var PIANCHANG_ONLINE = (function () {
     syncUserWb({ loud: true });   // 【User】社长 / 导演 / 男优：这个身份那条开，另外两条关
     await save(function (s) { addNews(s, k === '社长' ? '租下银星的二号棚，公司「' + coNm + '」开张' : '在' + d.dept + '那张通知上签了字，入职银星映像'); });   // 钱包按身份开出来
     applyRecent(); fabRefresh(); render();   // 面板开着（还是「先去开场白选部门」那一页）就跟着换成这张脸
-    var done = k === '社长' ? '开张了 · 「' + coNm + '」' : '已入职 · ' + d.dept;
+    if (lastId() === 0) rbSnap(0, false);   // v0.1.28：刚入职那一刻记在第 0 楼（重抽第 1 楼时退回到这里）
+    var done =k === '社长' ? '开张了 · 「' + coNm + '」' : '已入职 · ' + d.dept;
     if (lastId() !== 0) {   // 老聊天：已经往下走了，不重写开场
       toast('success', done + '。这个聊天已经往下聊了，开场就不重写了，接着聊就行。' + fabWhere() + '的场记板是' + (k === '社长' ? '公司' : '片场') + '面板。');
       return;
@@ -10324,15 +10541,24 @@ var PIANCHANG_ONLINE = (function () {
   }
   async function onMainReceived(mesId, type) {
     if (type === 'first_message') return;
+    // v0.1.28：生成前已经退回上一个存档点了 → 这一楼当新楼算（日子照新写的推、邀约照掷）；处理完记这一楼的存档点（排在叮叮读完正文以后）
+    var fresh = RB_FRESH[mesId]; delete RB_FRESH[mesId]; RB_PEND = 0; GEN_ON = 0;
+    if (fresh && Date.now() - fresh < 900000 && (type === 'swipe' || type === 'regenerate')) type = 'normal';
+    var did = false, snap = function () { if (did) return Promise.resolve(); did = true; var p = (type === 'impersonate' || type === 'quiet') ? Promise.resolve() : rbSnap(mesId, true); return p.then(pipeDone, pipeDone); };
+    PIPE++;
     newsReceived();
     try { await onTimeTag(mesId, type); } catch (e) {}   // 先把日子对上，再掷今天的邀约
-    try { if (DD && typeof DD.onMainReceived === 'function') DD.onMainReceived(mesId, type); } catch (e) {}   // 叮叮读正文末尾的 <!--叮叮 …--> 和在场的人来消息：时间先推进，再来消息
+    try { if (DD && typeof DD.onMainReceived === 'function') DD.onMainReceived(mesId, type, snap); else _memoQ = _memoQ.then(snap, snap); } catch (e) { _memoQ = _memoQ.then(snap, snap); }   // 叮叮读正文末尾的 <!--叮叮 …--> 和在场的人来消息：时间先推进，再来消息
     maybePing(type);
     var st = readState(), sc = st.scene;
     if (sc && !sc.got) { GOT_MEM = sc.at; save(function (s) { if (s.scene && s.scene.at === sc.at) s.scene.got = true; }); }
     var sh = curShoot(st); if (sh && sh.note && !sh.noteGot) save(function (s) { var x = curShoot(s); if (x) x.noteGot = true; });
   }
   function onUserSent(mesId) {
+    userSent(mesId);
+    rbSnap(mesId, false);   // v0.1.28：玩家这一楼也记一个存档点（重抽下一楼时退回到这里）；排在上面那几笔存档后面
+  }
+  function userSent(mesId) {
     newsSent();
     var st = readState(), sc = st.scene;
     if (sc && (sc.got || GOT_MEM === sc.at)) clearScene();
@@ -10348,6 +10574,233 @@ var PIANCHANG_ONLINE = (function () {
     if (PULLED_Q.length) { var q = PULLED_Q.splice(0); if (ON) q.forEach(function (fid) { try { ON.autoUnlist(fid); } catch (e) {} }); }
     var st = readState();
     applyRecent(st); applyShoot(st); fabRefresh(st);
+  }
+
+  // ═════════════════════════ 楼层存档点：删楼 / 重抽，片场的账跟着撤（v0.1.28，crazyman2333「正文写的不好可以删除重新，但是脚本更新的东西没法撤回」）═════════════════════════
+  // 每一楼（玩家发的、AI 回的、入职那一刻的第 0 楼）处理完，把那一刻的存档精简一份记进这一楼的楼层变量 pc_post（照 MVU「一楼一份」：楼层变量按 swipe 分开存，跟着楼走、跟着楼删）
+  //   pc_post = { sid, ai, chain（往上最多 8 个存档点的 sid，[0] 是上一个）, head（AI 楼开头 24 个字：swipe 删掉以后变量可能对错位，对不上当没有）, at, st（精简存档） }
+  //   s.at = { sid, t, f, ai, chain, mark }：存档现在停在哪个存档点（mark：那一刻叮叮每个会话最后一条的 id）；s.touchAt：最后一次在面板 / 叮叮里动存档的时间（翻页、开弹层不算）
+  // 重抽：存档点以后没动过 → 生成前退回上一个存档点，新回复照新楼算；动过 → 照旧只对钟，toast 说一声
+  // 删楼：最新那楼的存档点不是现在这个 → 面板弹框问（日子、钱、叮叮要变的列出来）；中间删楼最新那楼没变，不动。看得见的都没变、也没动过，直接撤，不弹
+  // 换回旧的那版回复：那一版自己的存档点；没动过直接换，动过就问
+  // 不撤：联机（online 整块；存档点以后联机进出的账 online / fine / buyscript 撤完照记回去）、被抽查下架的片（服务器那边已经下了）、剧本、试戏、换的图、另一张脸 / 另一个钱包、通话记录、rev
+  // 存档点只留最近 6 楼；别的 swipe 上的等后面有新楼了（换不回去了）就收掉：一份几十 KB，留着会把聊天文件撑大
+  var RB_KEEP = 6, RB_SRV = { online: 1, fine: 1, buyscript: 1 }, RB_TOP = ['online', 'imgs', 'faces', 'wallets', 'at', 'touchAt', 'rev'];
+  var RB_GEN = { normal: 1, swipe: 1, regenerate: 1, 'continue': 1 }, RB_DEFER = '';   // 会写楼的生成（quiet 那些不算「正在生成」）
+  var RB_FRESH = {}, RB_PEND = 0, RB_NO = {}, RB_T = {}, RB_TOLD = {}, RB_N = 0, GEN_ON = 0, RB_REGEN_AT = 0, PIPE = 0;
+  var RB_OLD = '这个聊天是更新前开的：删楼、重抽都不撤片场的账（v0.1.28 以后新写的楼才记了存档点）';
+  function pipeDone() { PIPE = Math.max(0, PIPE - 1); }
+  function rbBusy() { try { return !!(GEN.busy || (CUR && CUR.busy) || (UI.tk && UI.tk.busy) || (DD && DD.busy && DD.busy())); } catch (e) { return false; } }   // 玩家点的生成还在跑（写剧本、面试、试戏、叮叮回消息）：落地时也算「动过」
+  function rbDirty(s) { return Math.max(Number(s.touchAt) || 0, TOUCH_AT) > (Number(obj(s.at).t) || 0); }
+  function rbTell(msg) { var k = curChatId() + '|' + msg; if (RB_TOLD[k]) return; RB_TOLD[k] = 1; toast('info', msg); }   // 撤不回的话一个聊天只说一次
+  function rbHead(t) { return String(t == null ? '' : t).replace(/\s+/g, '').slice(0, 24); }
+  function rbOmit(x, ks) { var o = {}; Object.keys(obj(x)).forEach(function (k) { if (ks.indexOf(k) < 0) o[k] = x[k]; }); return o; }
+  // 精简存档：去掉撤回时不动的几块；叮叮聊天记录不存全文：mark = 每个会话最后一条的 id；pmark = 上一个存档点的 mark；delta = 上一个存档点以后新来的那几条（换回同一楼的另一版时接回来）
+  function rbIdx(a, id) { for (var j = a.length - 1; j >= 0; j--) if (a[j] && a[j].id === id) return j; return -1; }
+  function rbSlim(s, pm) {
+    var o = rbOmit(s, RB_TOP), h = obj(obj(s.dd).h), mk = {}, dl = {};
+    o.dir = rbOmit(s.dir, ['scripts', 'takes']); o.act = rbOmit(s.act, ['scripts']); o.dd = rbOmit(s.dd, ['h', 'calls']);
+    Object.keys(h).forEach(function (id) {
+      var a = arr(h[id]), m = a[a.length - 1]; mk[id] = (m && m.id) || '';
+      if (!pm) return;
+      var j = !(id in pm) || !pm[id] ? -1 : rbIdx(a, pm[id]), d = a.slice(j + 1);
+      if (d.length && d.length <= 40 && (j >= 0 || !(id in pm) || !pm[id])) dl[id] = d;
+    });
+    o = clone(o); o.dd.mark = mk; o.dd.pmark = pm ? clone(pm) : null; o.dd.delta = clone(dl);
+    return o;
+  }
+  function rbVar(f) { try { var v = getVariables({ type: 'message', message_id: Number(f) }), p = v && v.pc_post; return p && p.sid && p.st ? p : null; } catch (e) { return null; } }
+  function rbAt(f) {   // 第 f 楼当前这一版的存档点
+    if (!(f >= 0)) return null;
+    var p = rbVar(f); if (!p) return null;
+    if (p.ai && p.head) { var m = null; try { m = (getChatMessages(f) || [])[0]; } catch (e) {} if (!m || rbHead(m.message) !== p.head) return null; }
+    return { f: Number(f), post: p };
+  }
+  function qRun(fn) { var p = _q.then(fn).catch(function (e) { try { console.warn('[声色片场] 存档点没写进楼层', e); } catch (e2) {} }); _q = p; return p; }
+  function rbSnap(mesId, ai) {
+    var ep = EPOCH, f = Number(mesId), m = null, pp = null;
+    try { m = (getChatMessages(f) || [])[0]; } catch (e) {}
+    if (!m) return Promise.resolve();
+    var old = rbVar(f);
+    save(function (s) {
+      if (!identity(s) || ep !== EPOCH) return;
+      var at = obj(s.at), now = Date.now(), sid = 'p' + now.toString(36) + (++RB_N).toString(36);
+      var re = old && old.sid === at.sid, chain = re ? arr(old.chain) : [at.sid].concat(arr(at.chain)).filter(Boolean).slice(0, 8);   // 同一楼再记一次（续写）：顶替它，接它的上一个
+      var pm = re ? obj(old.st && old.st.dd).pmark || null : at.sid && at.mark ? at.mark : null;
+      pp = { sid: sid, ai: !!ai, chain: chain, head: ai ? rbHead(m.message) : '', at: now, st: rbSlim(s, pm) };
+      s.at = { sid: sid, t: now, f: f, ai: !!ai, chain: chain, mark: pp.st.dd.mark };
+    });
+    return qRun(async function () {
+      if (!pp || ep !== EPOCH) return;
+      await updateVariablesWith(function (v) { v = obj(v); v.pc_post = pp; return v; }, { type: 'message', message_id: f });
+      await rbPrune(f);
+    });
+  }
+  async function rbPrune(F) {
+    for (var f = F - RB_KEEP; f >= Math.max(0, F - RB_KEEP - 6); f--) {
+      if (!rbVar(f)) continue;
+      try { await updateVariablesWith(function (v) { v = obj(v); delete v.pc_post; return v; }, { type: 'message', message_id: f }); } catch (e) {}
+    }
+    for (var g = F - 1; g >= Math.max(0, F - 2); g--) {   // 前一两楼别的 swipe 上的：后面有新楼了，换不回去了
+      try {
+        var x = (getChatMessages(g, { include_swipes: true }) || [])[0], sd = x && x.swipes_data, cur = Number(x && x.swipe_id) || 0, hit = false;
+        if (!Array.isArray(sd) || sd.length < 2) continue;
+        var nd = sd.map(function (d, i) { if (i === cur || !d || !d.pc_post) return d; hit = true; d = Object.assign({}, d); delete d.pc_post; return d; });
+        if (!hit) continue;
+        // 整组 swipe 一起写回（酒馆助手只有这一条路）：写之前核一下当前这版的正文和 extra 跟读到的一样，不一样就不碰，免得把这一楼的 extra（思考过程、模型名）冲掉
+        var c0 = (getChatMessages(g) || [])[0], si = arr(x.swipes_info);
+        if (!c0 || String(c0.message) !== String((x.swipes || [])[cur]) || JSON.stringify(c0.extra || {}) !== JSON.stringify(si[cur] || {})) continue;
+        await setChatMessages([{ message_id: g, swipe_id: cur, swipes: x.swipes, swipes_info: si, swipes_data: nd }], { refresh: 'none' });
+      } catch (e) {}
+    }
+  }
+  // 把存档点 t0 套到 s 上（save 回调里用，也拿拷贝预览）
+  function rbMerge(s, t0) {
+    var t = clone(t0), dd0 = obj(s.dd), k = { online: s.online, imgs: s.imgs, faces: s.faces, wallets: s.wallets, rev: s.rev, touchAt: s.touchAt, lseq: s.lseq, ds: obj(s.dir).scripts, dt: obj(s.dir).takes, as: obj(s.act).scripts, h: obj(dd0.h), calls: dd0.calls, ledger: arr(s.ledger), films: arr(obj(s.dir).films) };
+    Object.keys(s).forEach(function (x) { delete s[x]; });
+    Object.keys(t).forEach(function (x) { s[x] = t[x]; });
+    ['online', 'imgs', 'faces', 'wallets', 'rev', 'touchAt'].forEach(function (x) { if (k[x] !== undefined) s[x] = k[x]; });
+    s.dir = obj(s.dir); s.act = obj(s.act); s.dir.scripts = arr(k.ds); s.act.scripts = arr(k.as); if (k.dt) s.dir.takes = k.dt;
+    // 叮叮：每个会话截到存档点那一刻的最后一条（存档点以后才有的会话整个收掉）；那一条不在（换回同一楼的另一版）就截到上一个存档点，再接上那一版自己来的几条
+    s.dd = obj(s.dd); var mk = obj(s.dd.mark), pm = s.dd.pmark ? obj(s.dd.pmark) : null, dl = obj(s.dd.delta), h = {};
+    Object.keys(mk).forEach(function (id) {
+      var a = arr(k.h[id]), want = mk[id];
+      if (!want) { h[id] = []; return; }
+      var i = rbIdx(a, want); if (i >= 0) { h[id] = a.slice(0, i + 1); return; }
+      if (!pm || !dl[id]) { if (a.length) h[id] = a; return; }   // 接不回来：照现在的留着
+      var j = id in pm && pm[id] ? rbIdx(a, pm[id]) : -1, base = !(id in pm) || !pm[id] ? [] : j >= 0 ? a.slice(0, j + 1) : a, seen = {};
+      base.forEach(function (m) { if (m && m.id) seen[m.id] = 1; });
+      h[id] = base.concat(arr(dl[id]).filter(function (m) { return m && !seen[m.id]; }));
+    });
+    delete s.dd.mark; delete s.dd.pmark; delete s.dd.delta; s.dd.h = h; s.dd.calls = obj(k.calls);
+    var lq = Number(t.lseq) || 0, have = {}; s.ledger = arr(s.ledger);
+    s.ledger.forEach(function (e) { if (e && e.q) have[e.q] = 1; });
+    k.ledger.forEach(function (e) { if (e && RB_SRV[e.kind] && Number(e.q) > lq && !have[e.q]) { s.ledger.push(clone(e)); s.money = Math.round((Number(s.money) || 0) + (Number(e.amount) || 0)); } });   // 联机进出的钱：服务器那边已经算了，照记回去
+    if (s.ledger.length > 200) s.ledger = s.ledger.slice(-200);
+    s.lseq = Math.max(Number(k.lseq) || 0, lq);
+    var cf = {}; k.films.forEach(function (f) { if (f && f.id) cf[f.id] = f; });
+    s.dir.films = arr(s.dir.films).map(function (f) { var c = f && cf[f.id]; return c && c.status === 'pulled' && f.status !== 'pulled' ? c : f; });   // 被抽查下架的：联机那份已经下了，保持下架
+    return s;
+  }
+  function rbPreview(st, pp) { return rbMerge(clone(st), pp.st); }
+  function rbWho(s, id) {
+    var a = obj(obj(s.dd).added)[id]; if (a && a.name) return a.name;
+    if (id === 'K') return '柯大河'; if (/^n_/.test(id)) return id.slice(2);
+    try { var c = DD && DD.contacts ? DD.contacts(s).find(function (x) { return x.id === id; }) : null; if (c) return c.name; } catch (e) {}
+    return id;
+  }
+  // 撤回前后看得见的差别：日子、钱、叮叮消息
+  function rbSum(a, b) {
+    var out = [], dm = Math.round((Number(b.money) || 0) - (Number(a.money) || 0));
+    if (Number(a.day) !== Number(b.day)) out.push('日子：' + C.mdText(a.day) + ' → ' + C.mdText(b.day) + '（' + (b.day < a.day ? '退回 ' + (a.day - b.day) : '往后 ' + (b.day - a.day)) + ' 天）');
+    if (dm) out.push('钱：' + money(a.money) + ' → ' + money(b.money) + '（' + (dm > 0 ? '+' : '−') + money(Math.abs(dm)) + '）');
+    var ids = function (s) { var o = {}, h = obj(obj(s.dd).h); Object.keys(h).forEach(function (k) { arr(h[k]).forEach(function (m) { if (m && m.id) o[m.id] = k; }); }); return o; };
+    var A = ids(a), B = ids(b), gone = 0, back = 0, who = {};
+    Object.keys(A).forEach(function (id) { if (!B[id]) { gone++; who[rbWho(a, A[id])] = 1; } });
+    Object.keys(B).forEach(function (id) { if (!A[id]) back++; });
+    if (gone) out.push('叮叮：' + gone + ' 条消息会没了（' + Object.keys(who).slice(0, 4).join('、') + (Object.keys(who).length > 4 ? '……' : '') + '）');
+    if (back) out.push('叮叮：' + back + ' 条消息回来');
+    return out;
+  }
+  function rbRestore(hit) {
+    var pp = hit.post, ok = false;
+    return save(function (s) {
+      if (!pp || !pp.st || !identity(s) || identity(pp.st) !== identity(s)) return;
+      var mk = obj(pp.st.dd).mark || {};
+      rbMerge(s, pp.st);
+      s.at = { sid: pp.sid, t: Date.now(), f: hit.f, ai: !!pp.ai, chain: arr(pp.chain), mark: mk };
+      ok = true;
+    }).then(function () {
+      if (!ok) return false;
+      TOUCH_AT = 0; CUR = null; GOT_MEM = null; NEWS_GOT = {}; NEWS_GONE = {};
+      if (UI.modal && UI.modal.kind === 'endday' && UI.modal.why) UI.modal = null;   // 正文写的跳日子（0.1.26 那个弹框）跟着那一楼撤掉
+      applyScene(); applyTalent(); try { if (DD) DD.refreshInjection(); } catch (e) {}
+      ddBadge(); render();
+      return true;
+    });
+  }
+  // 重抽：要重写的这楼正是存档停着的那楼，就退回它的上一个存档点
+  async function rbBeforeGen(type) {
+    if (type !== 'swipe' && type !== 'regenerate') return;
+    if (type === 'regenerate') RB_REGEN_AT = Date.now();
+    await _q;
+    var st = readState(), at = obj(st.at), n = lastId(), last = null;
+    if (!identity(st) || n < 0) return;
+    if (!at.sid) { rbTell(RB_OLD); return; }
+    try { last = (getChatMessages(n) || [])[0]; } catch (e) {}
+    var target = type === 'swipe' || (last && last.role === 'assistant' && Number(at.f) === n) ? n : n + 1;   // regenerate：酒馆可能已经先把要重写的那楼删了
+    if (!at.ai || Number(at.f) !== target) return;   // 存档停着的不是这一楼（老楼、那楼没记上）：照旧只对钟
+    var prev = arr(at.chain)[0], hit = null;
+    for (var f = target - 1; f >= Math.max(0, target - 8) && !hit; f--) { var h0 = rbAt(f); if (h0 && h0.post.sid === prev) hit = h0; }
+    if (!hit) { rbTell('重抽：这一楼前面没有存档点（更新前的老楼），片场的账没撤，日子、钱照旧'); return; }
+    if (rbDirty(st)) { toast('info', '重抽：上一版之后你在面板 / 叮叮里动过东西，片场的账没撤'); return; }
+    var sum = rbSum(st, rbPreview(st, hit.post));
+    if (await rbRestore(hit)) { RB_FRESH[target] = Date.now(); RB_PEND = target; if (sum.length) toast('info', '↩ 重抽：上一版带来的变化撤了（' + sum.join('；') + '）'); }
+  }
+  // 删楼 / 换 swipe / 重抽没写出来 / 切进来的聊天（分支）：最新那楼的存档点和存档停着的对一对
+  async function rbSync(why, tries) {
+    if (GEN_ON && Date.now() - GEN_ON < 180000) { if (why === 'del') RB_DEFER = why; return; }   // 正在生成（regenerate 自己也会删楼）：生成前那一步管；生成完再对一次
+    if (why === 'del' && Date.now() - RB_REGEN_AT < 4000) return;
+    if (PIPE > 0) { if ((tries || 0) < 20) setTimeout(function () { rbSync(why, (tries || 0) + 1); }, 500); return; }
+    await _q;
+    var st = readState(), at = obj(st.at), L = lastId();
+    if (!identity(st) || L < 0) return;
+    if (!at.sid) { if (why === 'del') rbTell(RB_OLD); return; }
+    var hit = rbAt(L), lm = null;
+    if (!hit && why === 'del' && L > 0) { try { lm = (getChatMessages(L) || [])[0]; } catch (e) {} if (lm && lm.role === 'user') hit = rbAt(L - 1); }   // 玩家那楼没赶上记，就看上一楼
+    if (!hit) { if (why === 'del') rbTell('删到的那楼太早了（存档点只留最近 6 楼），片场的账撤不回，照现在的接着玩'); return; }
+    var pp = hit.post, key = pp.sid + '|' + at.sid;
+    if (pp.sid === at.sid || RB_NO[key] || st.rbNo === key) return;
+    var chain = arr(at.chain), pc = arr(pp.chain);
+    if (!(chain.indexOf(pp.sid) >= 0 || pc.indexOf(at.sid) >= 0 || (pc[0] && pc[0] === chain[0]))) return;   // 对不上谱系（别的分支）：不动
+    if (identity(pp.st) !== identity(st)) { if (why === 'del') rbTell('删掉的那几楼中间换过部门，片场的账撤不回'); return; }
+    var dirty = rbDirty(st), sum = rbSum(st, rbPreview(st, pp)), ask = why === 'del' || why === 'load';
+    if (!dirty && (!ask || !sum.length)) {
+      if (await rbRestore(hit) && sum.length) toast('info', '换成这一版：片场的账也换回这一版（' + sum.join('；') + '）');
+      return;
+    }
+    UI.modal = { kind: 'rollback', f: hit.f, sid: pp.sid, key: key, mode: ask ? 'del' : 'swipe', sum: sum, dirty: dirty };
+    if (PANEL.classList.contains('open')) render(); else openPanel();
+  }
+  function rbLater(why, ms) { clearTimeout(RB_T[why]); RB_T[why] = setTimeout(function () { rbSync(why).catch(function (e) { try { console.warn('[声色片场] 存档点对不上', e); } catch (e2) {} }); }, ms); }
+  function rbGenEnd() {   // 重抽前退回去了、新回复却没来（生成失败 / 停掉）：楼上还是旧那版，账换回旧那版
+    GEN_ON = 0;
+    if (RB_DEFER) { rbLater(RB_DEFER, 1500); RB_DEFER = ''; }
+    if (!RB_PEND) return;
+    var p = RB_PEND; setTimeout(function () { if (RB_PEND !== p) return; RB_PEND = 0; rbLater('gen', 0); }, 1500);
+  }
+  function rbAnswer(yes) {
+    var m = UI.modal; UI.modal = null;
+    if (!m || m.kind !== 'rollback') { render(); return; }
+    if (!yes) { RB_NO[m.key] = 1; save(function (s) { s.rbNo = m.key; }); render(); toast('info', '留着：片场的账照现在的算'); return; }   // 记进存档：刷新、切回来不再问同一回
+    var hit = rbAt(m.f);
+    if (!hit || hit.post.sid !== m.sid) { render(); toast('warning', '那一楼又变了（又删了 / 换了一版），这次没撤'); return; }
+    rbRestore(hit).then(function (ok) { if (ok) toast('success', '↩ 撤回了：片场回到第 ' + m.f + ' 楼写完那会儿'); else { render(); toast('warning', '没撤：存档点的部门和现在对不上'); } });
+  }
+  function rbModalHtml(st, m) {
+    var del = m.mode === 'del';
+    return '<div class="eb">UNDO</div><h2 class="h">' + (del ? '删掉的楼，片场的账也撤回？' : '换成这一版，片场的账也跟着换？') + '</h2>' +
+      '<div class="sub">' + (del ? '正文现在停在第 ' + m.f + ' 楼。撤回就回到这一楼写完那会儿：' : '第 ' + m.f + ' 楼换成了另一版回复。跟着换，片场回到这一版写完那会儿：') + '</div>' +
+      (m.sum.length ? m.sum.map(function (x) { return '<div class="sub">· ' + esc(x) + '</div>'; }).join('') : '<div class="sub">· 日子、钱、叮叮都不变（只是正文时间、近况这些小账）</div>') +
+      (m.dirty ? '<div class="err">那一楼以后你在面板 / 叮叮里做的事（接戏、发消息、收转账、拍摄进度……）也会一起撤回。</div>' : '') +
+      '<div class="sub faint">不撤：联机市场的钱和挂单、被抽查下架的片、写好的剧本、换的图。</div>' +
+      '<div class="act"><button class="btn" data-act="rb-keep">留着</button><button class="btn pri" data-act="rb-ok">撤回</button></div>';
+  }
+  // 面板 / 叮叮里动了存档的点击记一笔时间（捕获阶段，先于各自的处理）。纯翻页、开关弹层、设置、联机市场（联机的不撤）、换图不算
+  var RB_NAV = { close: 1, 'theme-open': 1, 'theme-close': 1, 'theme-set': 1, settings: 1, 'set-save': 1, 'key-clear': 1, 'llm-test': 1, 'llm-models': 1, 'tips-again': 1, 'tips-ok': 1, 'modal-x': 1, 'modal-bg': 1,
+    ledger: 1, 'cal-prev': 1, 'cal-next': 1, endday: 1, skip: 1, 'to-co': 1, 'co-rename': 1, 'co-rename-x': 1, 'cast-script': 1, 'cs-call': 1, 'tk-mode': 1, 'tk-who': 1, 'tk-n': 1, 'mk-pov': 1, scf: 1,
+    profile: 1, 'to-take': 1, 'gen-open': 1, 'idea-open': 1, 'gen-mode': 1, 'gen-tier': 1, 'idea-pov': 1, 'idea-len': 1, 'gen-toku': 1, 'gen-draw': 1, 'custom-open': 1, 'sc-view': 1, 'sc-take': 1, 'sc-shoot': 1,
+    'cand-sign': 1, 'sh-drop-ask': 1, 'wb-retry': 1, 'sc-post': 1, 'rb-ok': 1, 'rb-keep': 1 };
+  var RB_DDX = { flush: 1, send: 1, stk: 1, 'tf-go': 1, 'vc-go': 1, reroll: 1, recall: 1, claim: 1, inv: 1, call: 1, 'c-popok': 1, 'c-roll': 1, 'c-hang': 1, 'set-clear': 1 };
+  function touchAct(e) {
+    var t = e.target; if (!t || !t.closest) return;
+    if (e.type === 'keydown') { if (e.key === 'Enter' && !e.shiftKey && /^(pcdd-in|pc-stage-in|pc-coname)$/.test(t.id || '')) TOUCH_AT = Date.now(); return; }
+    var x = t.closest('[data-x]'); if (x && PANEL.contains(x)) { if (RB_DDX[x.getAttribute('data-x')]) TOUCH_AT = Date.now(); return; }
+    var a = t.closest('[data-act]'); if (!a || !PANEL.contains(a) || t.closest('.pc-pfhost')) return;
+    var act = a.getAttribute('data-act') || '';
+    if (RB_NAV[act] || act.indexOf('ol-') === 0 || act.indexOf('face-') === 0) return;
+    if (act === 'endday-ok' && a.getAttribute('data-clock')) return;   // 正文写的日子跳过去（0.1.26 那个弹框）：算那一楼带来的
+    TOUCH_AT = Date.now();
   }
 
   // ═════════════════════════ 叮叮（dingding.js）：柯大河置顶 ═════════════════════════
@@ -10429,6 +10882,7 @@ var PIANCHANG_ONLINE = (function () {
         identity: function (s) { return identity(s); },
         ttsConfig: function () { return ttsConfig(); },   // 设置页的语音：{ backend, fish: {key,url,model,source}|null, mm: {...}|null, speed }
         quiet: function (s) { return !!curShoot(s || readState()); },   // 拍摄中不主动来消息
+        castInfo: function (c, s) { return castInfo(c, s || readState()); }, castIn: function (c) { return castIn(c); },   // v0.1.28 约来面试
         hookMain: false,   // MESSAGE_RECEIVED 由主脚本在 onTimeTag 之后转给 DD.onMainReceived
       });
     } catch (e) { DD = null; try { console.warn('[声色片场] 叮叮没起来', e); } catch (e2) {} }
@@ -10521,7 +10975,7 @@ var PIANCHANG_ONLINE = (function () {
   }
   // 面板上跟着「这张脸」走的临时东西：换身份（社长 ↔ 导演收起另一份）、切聊天时清掉
   function resetFaceUI() {
-    CUR = null; UI.modal = null; UI.coRename = null; UI.profile = null; UI.face = null;
+    CUR = null; UI.modal = null; UI.coRename = null; UI.profile = null; UI.face = null; UI.hlCand = null;
     UI.sh = { sid: '', cast: {}, busy: false, dirBy: 'self' }; UI.tk = { tid: '', sid: '', n: 0, dir: '', busy: false, mode: 'dir' };
   }
   function onChatChanged() {
@@ -10537,6 +10991,9 @@ var PIANCHANG_ONLINE = (function () {
     applyScene(); applyShoot(); applyRecent();
     try { if (DD) { DD.onChatChanged(); ddBadge(); } } catch (e) {}
     try { if (ON) ON.onChatChanged(); } catch (e) {}
+    // v0.1.28：楼层存档点的临时记号跟着聊天走；进来对一次（聊天分支：楼停在前面，存档却是分支那一刻的 → 问撤不撤）
+    TOUCH_AT = 0; RB_FRESH = {}; RB_PEND = 0; RB_DEFER = ''; GEN_ON = 0; PIPE = 0; Object.keys(RB_T).forEach(function (k) { clearTimeout(RB_T[k]); });
+    rbLater('load', 1200);
     refresh(); render();
     setTimeout(function () { refresh(); hintOldChat(); }, 400);   // 楼层可能还在渲染
   }
@@ -10565,10 +11022,15 @@ var PIANCHANG_ONLINE = (function () {
       'MORE_MESSAGES_LOADED', 'CHARACTER_MESSAGE_RENDERED', 'USER_MESSAGE_RENDERED'].forEach(function (n) { on(T[n], scheduleRefresh); });
     on(T.MESSAGE_RECEIVED, onMainReceived);
     on(T.MESSAGE_SENT, onUserSent);
-    on(T.GENERATION_AFTER_COMMANDS, onBeforeGen);
+    on(T.GENERATION_AFTER_COMMANDS, beforeGen);
     on(T.WORLDINFO_UPDATED, onWbUpdated);
     on(T.GENERATION_ENDED, openingSpent);
     on(T.GENERATION_STOPPED, openingSpent);
+    // v0.1.28 楼层存档点：删楼、换 swipe 等楼层落定了再对（酒馆删楼时报的楼号不可信，一律看最新那楼）
+    on(T.MESSAGE_DELETED, function () { rbLater('del', 400); });
+    on(T.MESSAGE_SWIPED, function () { rbLater('swipe', 300); });
+    on(T.GENERATION_ENDED, rbGenEnd);
+    on(T.GENERATION_STOPPED, rbGenEnd);
     try { if (typeof iframe_events !== 'undefined') on(iframe_events.GENERATION_ENDED, openingSpent); } catch (e) {}
     try {
       var btns = [{ name: BTN_PANEL, visible: true }, { name: BTN_RESET, visible: true }];
@@ -10587,6 +11049,7 @@ var PIANCHANG_ONLINE = (function () {
     STOPS.forEach(function (s) { try { s(); } catch (e) {} }); STOPS = [];
     try { if (MO) MO.disconnect(); } catch (e) {} MO = null;
     if (_tick) { clearTimeout(_tick); _tick = null; }
+    Object.keys(RB_T).forEach(function (k) { clearTimeout(RB_T[k]); });
     try { if (DD) DD.cleanup(); } catch (e) {}
     pf('destroy', DOC);   // 女优档案：样式表和盖着的那一层收掉
     try { uninjectPrompts([ID_IDENTITY, ID_OPENING, ID_RECENT, ID_SCENE, ID_SHOOT, ID_TALENT, ID_USERP]); } catch (e) {}
@@ -10623,7 +11086,9 @@ var PIANCHANG_ONLINE = (function () {
       spotCheck: spotCheck, publishFilm: publishFilm, reEdit: reEdit, postScript: postScript, syncUserWb: syncUserWb, wb: WB, USER_WB: USER_WB,
       theme: curTheme, setTheme: setTheme, THEMES: THEMES, llmApi: llmApi, genRaw: genRaw, ttsConfig: ttsConfig, credit: CREDIT, nsfwLow: nsfwLow, userPrompt: userPrompt, applyUserPrompt: applyUserPrompt, applyTalent: applyTalent, applyShoot: applyShoot, refuseReset: function () { REFUSE_AT = 0; },
       coName: coName, submitCo: submitCo, takeLoan: takeLoan, payLoanMonth: payLoanMonth, bankerCheck: bankerCheck, castReqs: castReqs, startCasting: startCasting, repsFor: repsFor, takeInChat: takeInChat, profile: PF,
-      faces: FX, faceUrl: faceUrl, imgKey: imgKey, openFace: openFace, os: OS };
+      faces: FX, faceUrl: faceUrl, imgKey: imgKey, openFace: openFace, os: OS,
+      addLedger: addLedger, rb: { at: rbAt, slim: rbSlim, sync: rbSync, dirty: function () { return rbDirty(readState()); }, touch: function () { return TOUCH_AT; } },   // v0.1.28 楼层存档点
+      castInfo: castInfo, castIn: castIn, drawJob: drawJob, jobChance: jobChance, drawInvites: drawInvites, goInvite: goInvite, setInvStatus: setInvStatus };   // v0.1.28 约来面试、外包
   } catch (e) {}
   console.info('[声色片场] 🎬 主脚本 v' + VERSION + ' 就位' + (identity() ? '（身份：' + identity() + '）' : '（还没选部门）'));
 })();
