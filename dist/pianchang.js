@@ -9569,7 +9569,7 @@ var PIANCHANG_ONLINE = (function () {
     if (m.kind === 'ledger') body = '<div class="eb">LEDGER</div><h2 class="h">' + moneyLabel(identity(st)) + ' · 账本</h2><div class="big">' + esc(money(st.money)) + '</div>' + ledgerHtml(st) + '<div class="act"><button class="btn" data-act="modal-x">关上</button></div>';
     else if (m.kind === 'byscript') body = byScriptHtml(st, m);
     else if (m.kind === 'sign') { var c = CUR && CUR.cands.find(function (x) { return x.id === m.id; }); body = '<div class="eb">SIGN</div><h2 class="h">签下 ' + esc(c ? c.realName : '') + '</h2><div class="sub">起一个艺名（1 到 6 个字）。签约金 ' + esc(money(c ? c.signFee : 0)) + '，一部片酬 ' + esc(money(c ? c.fee : 0)) + '。明天（' + esc(C.mdText(st.day + LAW.signToShoot)) + '）起就能进棚。</div><input type="text" id="pc-stage-in" maxlength="6" placeholder="艺名" style="margin-top:10px">' + (m.err ? '<div class="err">' + esc(m.err) + '</div>' : '') + '<div class="act"><button class="btn" data-act="modal-x">再想想</button><button class="btn pri" data-act="sign-ok" data-id="' + esc(m.id) + '">签</button></div>'; }
-    else if (m.kind === 'endday') body = '<div class="eb">END OF DAY</div><h2 class="h">' + (m.n > 1 ? '跳到 ' + esc(C.mdText(st.day + m.n)) + '（' + m.n + ' 天）' : '结束今天') + '</h2><div class="sub">' + (m.n > 1 ? '中间每一天照样过：月初结账、发售、片酬到账、新片约都会算。' : '明天是 ' + esc(C.mdText(st.day + 1)) + '。') + (markText(st, st.day + m.n) ? '那天：' + esc(markText(st, st.day + m.n)) : '') + '</div>' + (curShoot(st) ? '<div class="err">片场还在拍：过了今天也接着算这一部。</div>' : '') + '<div class="act"><button class="btn" data-act="modal-x">算了</button><button class="btn pri" data-act="endday-ok" data-n="' + m.n + '">好</button></div>';
+    else if (m.kind === 'endday') body = '<div class="eb">END OF DAY</div>' + (m.why ? '<div class="sub">正文里写到了 ' + esc(m.why) + '，离片场的今天（' + esc(C.mdShort(st.day)) + '）差 ' + m.n + ' 天。跟着跳吗？AI 写错了日期就点「算了」。</div>' : '') + '<h2 class="h">' + (m.n > 1 ? '跳到 ' + esc(C.mdText(st.day + m.n)) + '（' + m.n + ' 天）' : '结束今天') + '</h2><div class="sub">' + (m.n > 1 ? '中间每一天照样过：月初结账、发售、片酬到账、新片约都会算。' : '明天是 ' + esc(C.mdText(st.day + 1)) + '。') + (markText(st, st.day + m.n) ? '那天：' + esc(markText(st, st.day + m.n)) : '') + '</div>' + (curShoot(st) ? '<div class="err">片场还在拍：过了今天也接着算这一部。</div>' : '') + '<div class="act"><button class="btn" data-act="modal-x">算了</button><button class="btn pri" data-act="endday-ok" data-n="' + m.n + '"' + (m.clock ? ' data-clock="' + esc(m.clock) + '"' : '') + '>好</button></div>';
     else if (m.kind === 'script') { var rec = scriptRec(st, m.id), sc = parsed(rec); body = '<div class="eb">SCRIPT</div><h2 class="h">《' + esc(sc ? sc.title : '') + '》</h2>' + (rec && rec.slots ? '<div class="faint" style="margin-bottom:6px">抽卡单：' + esc(rec.slots) + '</div>' : '') + '<div class="script">' + esc(rec && sc ? C.markIdea(C.scriptAllText(sc), rec.idea) : '') + '</div><div class="act">' + (sc ? '<button class="btn" data-act="sc-post" data-id="' + esc(m.id) + '">📄 发剧本</button>' : '') + '<button class="btn" data-act="modal-x">关上</button></div>'; }
     else if (m.kind === 'gen' && m.mode === 'idea') body = genTabs('idea') + ideaBody(m);
     else if (m.kind === 'gen') {
@@ -9868,7 +9868,7 @@ var PIANCHANG_ONLINE = (function () {
       case 'cal-next': UI.calOff++; render(); break;
       case 'endday': UI.modal = { kind: 'endday', n: 1 }; render(); break;
       case 'skip': UI.modal = { kind: 'endday', n: Math.max(1, Math.min(130, nextMark(st) - st.day)) }; render(); break;
-      case 'endday-ok': { var n = Number(t.getAttribute('data-n')) || 1; UI.modal = null; UI.calSel = null; UI.calOff = 0; endDays(n); break; }
+      case 'endday-ok': { var n = Number(t.getAttribute('data-n')) || 1, ck = t.getAttribute('data-clock'); UI.modal = null; UI.calSel = null; UI.calOff = 0; endDays(n).then(function () { if (ck) save(function (s) { s.clock = ck; }).then(render); }); break; }
       case 'inv-accept': setInvStatus(id, 'accepted'); break;
       case 'inv-ignore': setInvStatus(id, 'ignored'); break;
       case 'inv-go': goInvite(id); break;
@@ -10296,7 +10296,8 @@ var PIANCHANG_ONLINE = (function () {
       }
       var clean = txt.replace(TIME_RE_ALL, '\n').replace(/\n{3,}$/, '\n').trimEnd();
       try { await setChatMessages([{ message_id: m.message_id, message: clean }], { refresh: 'affected' }); } catch (e) {}
-      if (wild) { toast('warning', '正文写的日期 ' + (mm[3] ? mm[3] + '/' : '') + mm[4] + '/' + mm[5] + ' 离片场的今天（' + C.mdShort(st.day) + '）差了 ' + wild + ' 天，当写错了，没跟着跳；真要过日子，去「日历」点'); return; }
+      // v0.1.26（crazyman2333：正文写「过了两个星期」不跳）：超过 7 天不再整条不认，打开面板问一句，玩家点「好」才跳；AI 写错的现实日期点「算了」
+      if (wild) { UI.modal = { kind: 'endday', n: wild, why: (mm[3] ? mm[3] + '/' : '') + mm[4] + '/' + mm[5], clock: pad2(hh) + ':' + mi }; openPanel(); return; }
       var out = [];
       await save(function (s) { for (var i = 0; i < adv; i++) rollDay(s, out, i < adv - 1); s.clock = pad2(hh) + ':' + mi; });
       if (adv) { out.unshift('正文过了 ' + adv + ' 天，现在是 ' + C.mdText(st.day + adv)); rollToasts(out); }
