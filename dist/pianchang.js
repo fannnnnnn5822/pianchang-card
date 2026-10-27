@@ -3707,9 +3707,21 @@ var PIANCHANG_DD = (function () {
     if (id && id.indexOf('g_') === 0) { var g = groups(s).find(function (x) { return x.id === id; }); return g ? Object.assign({ group: true }, g) : null; }
     return contacts(s).find(function (c) { return c.id === id; }) || null;
   }
+  // v0.1.36（亚伦：先按本名「严知微」加了好友，没头像；再按艺名「白桃」加，又多出一个人）：有名有姓的 NPC 本名 / 艺名归成一个正名（艺名）。
+  //   照 SB 卡的 normalizeName + mergeDupeNpcs：认名字时先换成正名；读档时（norm）把已经分成两个的会话合回一个
+  function knownOf(n) {   // 银星的女优（lists.cast0）、男优（lists.actors）：{ c } / { a }
+    var L0 = Lx(), c = (L0.cast0 || []).find(function (x) { return x && (x.realName === n || x.stageName === n); });
+    if (c) return { c: c };
+    var a = (L0.actors || []).find(function (x) { return x && (x.realName === n || x.name === n); });
+    return a ? { a: a } : null;
+  }
+  function canonName(n) { n = String(n || '').trim(); var k = n && knownOf(n); return k ? (k.c ? k.c.stageName : k.a.name) : n; }
+  function canonSub(n) { var k = knownOf(n); return k && k.c ? (L_STUDIO() + '的女优 · 本名' + k.c.realName) : k && k.a ? '男优 · 本名' + k.a.realName : ''; }
+  function L_STUDIO() { return Lx().studio || '银星映像'; }
   function contactByName(name, s) {
     var n = String(name || '').trim(); if (n === K_NICK) n = K_NAME;
-    return contacts(s).find(function (c) { return c.name === n || (c.ref && (c.ref.name === n || c.ref.realName === n || c.ref.stageName === n || c.ref.given === n)); }) || null;
+    var cn = canonName(n);
+    return contacts(s).find(function (c) { return c.name === n || c.name === cn || (c.ref && [c.ref.name, c.ref.realName, c.ref.stageName, c.ref.given].some(function (x) { return x && (x === n || x === cn); })); }) || null;
   }
   function avatarOf(c) {
     var nm = String((c && c.name) || '?'), ch = nm.replace(/[^0-9A-Za-z一-鿿]/g, '').charAt(0) || '·';
@@ -4848,7 +4860,8 @@ var PIANCHANG_DD = (function () {
     var had = contactByName(n, s) || (met && findChat('t_' + met.id, s));
     if (had) return { id: had.id, name: had.name, had: true };
     if (met) return { id: 't_' + met.id, name: met.realName || met.name, info: { kind: 'met', name: met.realName || met.name } };
-    if (String(ask || '').indexOf(n) >= 0 || await wbNpc(n) || (await seenText(s)).indexOf(n) >= 0) return { id: 'n_' + n, name: n, info: { kind: 'free', name: n } };   // v0.1.27：正文整楼 40 楼 + 叮叮里聊到过的都算出过场
+    var cn = canonName(n), cs = canonSub(n), seenT = await seenText(s);
+    if (String(ask || '').indexOf(n) >= 0 || await wbNpc(n) || seenT.indexOf(n) >= 0 || (cn !== n && seenT.indexOf(cn) >= 0)) return { id: 'n_' + cn, name: cn, info: cs ? { kind: 'free', name: cn, sub: cs } : { kind: 'free', name: cn } };   // v0.1.36：本名、艺名都落成正名   // v0.1.27：正文整楼 40 楼 + 叮叮里聊到过的都算出过场
     return null;
   }
   async function applyReply(id, c, res, o) {
@@ -5346,7 +5359,7 @@ var PIANCHANG_DD = (function () {
   async function chatForName(name, s, story) {
     var n = String(name || '').replace(/[\[\]【】「」*]/g, '').trim(); if (!n || n.length > 12) return null;
     var c = contactByName(n, s); if (c) return c;
-    if (await wbNpc(n) || (n.length >= 2 && n !== uc(s) && story && story.indexOf(n) >= 0)) return { id: 'n_' + n, name: n, sub: '找过你的人', kind: 'visitor' };
+    if (await wbNpc(n) || (n.length >= 2 && n !== uc(s) && story && story.indexOf(n) >= 0)) { var cn = canonName(n); return { id: 'n_' + cn, name: cn, sub: canonSub(n) || '找过你的人', kind: 'visitor' }; }   // v0.1.36：本名落成正名
     return null;
   }
   async function floorScan(mesId, type) {
@@ -5639,7 +5652,23 @@ var PIANCHANG_DD = (function () {
     var d = s.dd = (s.dd && typeof s.dd === 'object' && !Array.isArray(s.dd)) ? s.dd : {};
     ['h', 'q', 'u', 'f', 'calls', 'added', 'bl', 'amb'].forEach(function (k) { if (!d[k] || typeof d[k] !== 'object' || Array.isArray(d[k])) d[k] = {}; });
     if (!Array.isArray(d.evk)) d.evk = [];
+    try { mergeAlias(d, s); } catch (e) {}
     return s;
+  }
+  function mergeAlias(d, s) {
+    var ids = Object.keys(d.h).concat(Object.keys(d.added)).filter(function (id, i, a) { return id.indexOf('n_') === 0 && a.indexOf(id) === i; });
+    ids.forEach(function (from) {
+      var nm = from.slice(2), cn = canonName(nm); if (!cn || cn === nm) return;
+      var r = rosterOf(s).find(function (x) { return x && (x.stageName === cn || x.name === cn); }), to = r ? 't_' + r.id : 'n_' + cn;
+      if (to === from) return;
+      var a = d.h[from] || [], b = d.h[to] || [];
+      if (a.length) { d.h[to] = b.concat(a).sort(function (x, y) { return (Number(x && x.ts) || 0) - (Number(y && y.ts) || 0); }); d.f[to] = d.h[to].length; }   // 合过来的旧消息算已经写进过正文
+      delete d.h[from]; delete d.f[from];
+      ['u', 'q'].forEach(function (k) { if (d[k][from] != null) { d[k][to] = (Number(d[k][to]) || 0) + (Number(d[k][from]) || 0); delete d[k][from]; } });
+      if (d.calls[from]) { d.calls[to] = (d.calls[to] || []).concat(d.calls[from]).slice(-10); delete d.calls[from]; }
+      if (d.bl[from]) { if (!d.bl[to]) d.bl[to] = d.bl[from]; delete d.bl[from]; }
+      if (d.added[from]) { if (!r && !d.added[to]) d.added[to] = Object.assign({}, d.added[from], { name: cn }, canonSub(nm) ? { sub: canonSub(nm) } : {}); delete d.added[from]; }
+    });
   }
   return {
     init: init, attach: attach, cleanup: cleanup, onChatChanged: onChatChanged, refreshInjection: refreshInjection, refresh: refreshView,
