@@ -303,7 +303,8 @@ var PIANCHANG_LISTS = {
     coStart: 200000,             // 开局公司账户
     coOffice: 30000,             // 每月 1 号：写字楼 + 剪辑室
     coStaff: [['柯大河', 'AD 兼摄影', 12000], ['化妆和场务（钟点工）', '', 8000]],   // 每月 1 号发的工资（自动扣）
-    dirFee: 3000,                // 请尹椿 / 邱德海来导一部
+    dirFee: 3000,                // 请尹椿 / 邱德海来导一部（挖过来的江蜜导一部也是这个价）
+    poachMul: 2,                 // v0.1.31 挖角：从银星挖江蜜，付银星的转会费 = 她一部片酬 × 这个数
     adFee: 2000,                 // 选角页「按剧本招」：一次招聘广告
     // 贷款（照声色事务所三档）：每月 1 号自动扣一期（本金平摊 + 剩余本金 × 月利率）；扣完还是负数 = 逾期罚息
     loans: [
@@ -495,7 +496,8 @@ var PIANCHANG_CORE = (function () {
 
   // ═════════════ 签约和上架后的抽查（10-23 Fan：新法等待整套拿掉，「片子上架以后被随机抽查，不过审查会被下架」）═════════════
   // 签了第二天就能进棚；剪完直接上架；上架后头 checkWindow 天里审查中心（方正）每天掷一次抽不抽这部，一部片一个窗口只抽一次
-  function canShootDay(person) { return (Number(person && person.signedDay) || -999) + (Number(LAW.signToShoot) || 1); }
+  // contractDay：后来重新签的约（v0.1.31 从银星挖过来的江蜜）；signedDay 不动——档案的身体、体检日都跟着它走
+  function canShootDay(person) { return Math.max(Number(person && person.signedDay) || -999, Number(person && person.contractDay) || -999) + (Number(LAW.signToShoot) || 1); }
   function daysToShoot(person, today) { return Math.max(0, canShootDay(person) - today); }
   function checkEnd(film) { return (Number(film && (film.checkFrom || film.releaseDay)) || 0) + (Number(LAW.checkWindow) || 30); }
   // 抽中的概率（每天）：尺度越高、NG 越多、特写糊弄过的场越多，越容易被抽
@@ -1152,6 +1154,10 @@ var PIANCHANG_CORE = (function () {
   function selfSeat(identity, shoot) { return dirLike(identity) && !!(shoot && shoot.seatCall) && (!!shoot.pov || shoot.self === 'obj'); }
   // 请来导的人（社长线：尹椿 / 邱德海）；自己导 = ''
   function npcDir(shoot) { var d = shoot && shoot.dirBy; return d && d !== 'self' ? String(d) : ''; }
+  // v0.1.31 自导自演：来导的人自己也在这一部的卡司里（挖过来的江蜜导她自己演的片）→ 她演的那个称呼；不是就 ''
+  function dirActs(shoot) { var nd = npcDir(shoot), c = (shoot && shoot.cast) || {}; return nd ? Object.keys(c).filter(function (k) { return c[k] === nd; })[0] || '' : ''; }
+  // 正文里怎么介绍这位导演：请来的 / 自导自演
+  function dirWho(shoot) { var nd = npcDir(shoot), acts = dirActs(shoot); return !nd ? '' : acts ? nd + '（自导自演：她自己也在镜头里演' + acts + '，柯大河掌机，喊完卡去监视器回看）' : '请来的' + nd; }
   function castLine(sc, shoot, identity) {
     var me = selfSeat(identity, shoot), nd = npcDir(shoot), who0 = identity === '社长' ? '社长' : '导演';
     var a = (sc.roles || []).filter(function (r) { return r.side !== '配'; }).map(function (r) {
@@ -1161,7 +1167,7 @@ var PIANCHANG_CORE = (function () {
       if (me && r.call === shoot.seatCall) return label + '＝{{user}}（' + who0 + '自己上，' + (shoot.pov ? '第一视角，自己拿机器' : '镜头外拍，柯大河掌机') + '）';
       return label + '＝' + (who ? (r.side === '他' ? '男优 ' : '女优 ') + who : '（还没选）');
     });
-    if (nd) a.push('导演＝' + nd + '（请来导这一部的）');
+    if (nd) a.push('导演＝' + nd + (dirActs(shoot) ? '（自导自演，她也演' + dirActs(shoot) + '）' : '（请来导这一部的）'));
     if (dirLike(identity) && !me) a.push(nd ? '{{user}} 是社长，不进镜头' : '{{user}} 是' + who0 + '，自己导，不进镜头');
     return '选角：' + a.join('；');
   }
@@ -1201,9 +1207,10 @@ var PIANCHANG_CORE = (function () {
     var scPov = isPovSc(sc), effPov = pov || (scPov && !(me && shoot.self === 'obj'));   // 这一部实际拍成第一视角没有
     var body = ((identity === '男优' || me) ? markPlayer(s.text, shoot.seatCall) : s.text).replace(/^镜：主观(：?)/gm, function (m0, c) { return effPov ? '镜：第一视角' + c : '镜：'; });   // 老剧本的「镜：主观：…」
     var mis = shoot.mishap && shoot.mishap[s.n];
-    var whoUser = boss ? '社长' : '导演';
-    var first = pov ? (nd ? '{{user}} 是社长，这一部自己上：坐男优位·主，第一视角（自己拿机器）；导演是请来的' + nd + '。' : '{{user}} 是' + whoUser + '，这一部自己上：坐男优位·主，第一视角（自己拿机器）。')
-      : me ? '{{user}} 是' + whoUser + '，这一部自己上：坐男优位·主，镜头外拍（柯大河掌机，{{user}} 在画面里）' + (nd ? '；导演是请来的' + nd : '，喊开机和卡的也是{{user}}') + '。'
+    var whoUser = boss ? '社长' : '导演', acts = dirActs(shoot);
+    var first = pov ? (nd ? '{{user}} 是社长，这一部自己上：坐男优位·主，第一视角（自己拿机器）；导演是' + dirWho(shoot) + '。' : '{{user}} 是' + whoUser + '，这一部自己上：坐男优位·主，第一视角（自己拿机器）。')
+      : me ? '{{user}} 是' + whoUser + '，这一部自己上：坐男优位·主，镜头外拍（柯大河掌机，{{user}} 在画面里）' + (nd ? '；导演是' + dirWho(shoot) : '，喊开机和卡的也是{{user}}') + '。'
+      : dirLike(identity) && nd && acts ? '{{user}} 是出钱的社长，这一部' + nd + '自导自演：她演' + acts + '，也是导演——柯大河掌机，她在镜头里喊开机、喊卡，一条拍完去监视器回看；{{user}} 在旁边看，不进镜头。'
       : dirLike(identity) && nd ? '{{user}} 是出钱的社长，这一部请' + nd + '来导：' + nd + '坐监视器后面喊开机和卡，{{user}} 在旁边看，不进镜头。'
       : boss ? '{{user}} 是社长，这一部自己导：坐在监视器后面喊开机和卡，不进镜头。'
       : identity === '导演' ? '{{user}} 是导演，坐在监视器后面喊开机和卡，不进镜头。' : '{{user}} 是这部片的男优，坐男优位·主。';
@@ -1234,11 +1241,11 @@ var PIANCHANG_CORE = (function () {
     if (pov && !nd) {
       a.push('【玩家的位子】{{user}} 坐男优位·主（在场里标了【{{user}}】），喊开机、喊卡也是 {{user}}。' + actRule + '男优位·二（有的话）是 NPC 男优，你来演。');
     } else if (me) {
-      a.push('【玩家的位子】{{user}} 坐男优位·主（在场里标了【{{user}}】）' + (nd ? '，' + nd + '在监视器后面喊开机、喊卡、给演员和{{user}}说戏，' + nd + '的话你来写。' : obj0() + '。') + actRule + '男优位·二（有的话）是 NPC 男优，你来演。');
+      a.push('【玩家的位子】{{user}} 坐男优位·主（在场里标了【{{user}}】）' + (nd ? '，' + nd + (acts ? '一边演' + acts + '一边导：喊开机、喊卡、给{{user}}说戏都是她，' : '在监视器后面喊开机、喊卡、给演员和{{user}}说戏，') + nd + '的话你来写。' : obj0() + '。') + actRule + '男优位·二（有的话）是 NPC 男优，你来演。');
     } else if (identity === '男优') {
       a.push('【玩家的位子】{{user}} 坐男优位·主（在场里标了【{{user}}】）。不写 {{user}} 的动作、表情、身体反应和心里，只写别人对他做的、对他说的；「提示·{{user}}」那句是给他的方向，不替他说出口。球踢给他就停：有人问他、等他回应，写完对方的动作和台词就收笔，把回合交回玩家。');
     } else if (nd) {
-      a.push('【玩家的位子】{{user}} 是社长，这一部请' + nd + '来导：开机、喊卡、给演员说戏都是' + nd + '，你来写；{{user}} 在监视器旁边看，随时可能插话，插了话演员和' + nd + '照他的意思调。男优位·主、二都是 NPC 男优，你来演。');
+      a.push('【玩家的位子】{{user}} 是社长，这一部' + (acts ? nd + '自导自演' : '请' + nd + '来导') + '：开机、喊卡、给演员说戏都是' + nd + (acts ? '（她自己也在镜头里演' + acts + '）' : '') + '，你来写；{{user}} 在监视器旁边看，随时可能插话，插了话演员和' + nd + '照他的意思调。男优位·主、二都是 NPC 男优，你来演。');
     } else {
       a.push('【玩家的位子】{{user}} 是导演：「导」和「镜」是给他的提示，他会在消息里喊开机、喊卡、改机位、给演员说戏；演员和摄影照他的话走。男优位·主、二都是 NPC 男优，你来演。导演没喊卡之前，这一条照剧本往下拍。');
     }
@@ -1700,7 +1707,7 @@ var PIANCHANG_CORE = (function () {
   }
 
   return {
-    LEAD_NOTE: LEAD_NOTE, dirLike: dirLike, selfSeat: selfSeat, npcDir: npcDir,
+    LEAD_NOTE: LEAD_NOTE, dirLike: dirLike, selfSeat: selfSeat, npcDir: npcDir, dirActs: dirActs,
     oneLine: oneLine, sfwOnly: sfwOnly, rehearseBonus: rehearseBonus, nameNorm: nameNorm, nameCheck: nameCheck, loanBill: loanBill, L: L, GRID: GRID, E: E, LAW: LAW, TIERS: TIERS, TONE: TONE,
     rndU32: rndU32, randInt: randInt, rndFloat: rndFloat, pick: pick, pickW: pickW, uid: uid, clamp: clamp, hash01: hash01, clip: clip, len: len, drawN: drawN,
     tierIdx: tierIdx, tierOk: tierOk, tierShort: tierShort,
@@ -2321,7 +2328,7 @@ var PIANCHANG_PROFILE = (function () {
   }
   function stats(p, day, opts) {
     var b = p.body || {}, c = cycleOf(p, day), vn = vulvaNow(p, day);
-    var ready = (Number(p.signedDay) || 0) + (opts && opts.signToShoot != null ? opts.signToShoot : 1) <= day;
+    var ready = Math.max(Number(p.signedDay) || 0, Number(p.contractDay) || 0) + (opts && opts.signToShoot != null ? opts.signToShoot : 1) <= day;   // contractDay：挖角重签的那天
     var cells = [
       [arr(p.films).length + ' 部', '拍过'],
       [examined(p) ? partnerCount(p) + ' 人' : '—', '性经验'],
@@ -7205,6 +7212,9 @@ var PIANCHANG_ONLINE = (function () {
         else a.push('今天 14:00 三号棚那场：尹椿交过来的，女主江蜜' + (jm ? '（片酬 ' + money(jm.fee) + '）' : '') + '，男优位还空着，导演是{{user}}；男优照银星的价目：' + mens + '（开机时从部门预算里付）');
         paid = true;
       }
+      // v0.1.31：挖过来的人（世界书里她还写着是银星的）
+      var pch = id === '社长' ? st.dir.cast.filter(function (c) { return c && c.poached; }) : [];
+      if (pch.length) a.push('从银星挖过来的：' + pch.map(function (c) { return c.stageName; }).join('、') + '（现在签在{{user}}的公司，不再是银星的人；也能导戏）');
       var ln = id === '社长' && st.dir.co && st.dir.co.loan;
       if (ln) { var lb = C.loanBill(ln); a.push('公司欠信用金库 ' + money(ln.left) + '（第 ' + (ln.paid + 1) + '/' + ln.months + ' 期，每月 1 号自动扣 ' + money(lb.principal + lb.interest) + '）'); }
       var pulled = st.dir.films.filter(function (f) { return f.status === 'pulled'; });
@@ -8328,8 +8338,12 @@ var PIANCHANG_ONLINE = (function () {
   function castShow(nm) { return nm === SELF ? '我（第一视角）' : nm === SELF_O ? '我（镜头外拍）' : nm; }
   // 这一部是不是 {{user}} 自己坐男优位·主（第一视角或镜头外拍）：要掷收尾骰、扣自己的状态
   function selfIn(sh) { return !!(sh && (sh.pov || sh.self === 'obj')); }
+  // 社长线「导演位」能请的人：尹椿、邱德海，加上公司里能导戏的（v0.1.31：从银星挖过来的江蜜）
+  var NPC_DIRS = ['尹椿', '邱德海'];
+  function dirCast(st) { return st.dir.cast.filter(function (c) { return c && c.canDirect && !c.borrowed; }); }
   function dirCheck(st, sc, cast, dirBy) {
     var why = [], warn = [], cost = E.studioRent + E.crew + (dirBy && dirBy !== 'self' ? (Number(E.dirFee) || 0) : 0);
+    if (dirBy && dirBy !== 'self' && NPC_DIRS.indexOf(dirBy) < 0 && !dirCast(st).some(function (c) { return c.stageName === dirBy; })) why.push(dirBy + ' 不在公司里，导不了');
     rolesNeeding(sc).forEach(function (r) {
       var who = cast[r.call];
       if (!who) { why.push((r.side === '他' ? r.call + '（男优位·' + r.seat + '）' : r.call) + ' 还没选人'); return; }
@@ -9482,11 +9496,12 @@ var PIANCHANG_ONLINE = (function () {
       '<div class="inf hd"><div class="nm2">' + esc(c.stageName) + tierTag(c.tier) + '</div>' +
       '<div class="rn">本名 ' + esc(c.realName) + ' · ' + c.age + ' 岁 · ' + esc(c.rankLabel || ('经验 ' + c.rank + '/5')) + ' · 一部 ' + esc(money(c.fee)) + '</div></div><div class="inf bd">' +
       (c.line ? '<div class="rn">' + esc(c.line) + '</div>' : c.gen && c.gen.want ? '<div class="rn">' + esc(c.gen.want) + '</div>' : '') +
-      (c.borrowed || c.forScript ? '<div class="pc-tags">' + (c.borrowed ? '<span class="tag gr">银星借来的 · 拍完这一部回银星</span>' : '') + (c.forScript ? '<span class="tag gr">冲《' + esc(c.forScript.title) + '》来的</span>' : '') + '</div>' : '') +
+      (c.borrowed || c.forScript || c.poached ? '<div class="pc-tags">' + (c.borrowed ? '<span class="tag gr">银星借来的 · 拍完这一部回银星</span>' : '') + (c.poached ? '<span class="tag gr">从银星挖来的 · 也能导戏</span>' : '') + (c.forScript ? '<span class="tag gr">冲《' + esc(c.forScript.title) + '》来的</span>' : '') + '</div>' : '') +
       personTags(c) +
       '<div class="rn">' + (left ? '今天才签的约，' + esc(C.mdShort(C.canShootDay(c))) + ' 起能进棚' : '可以开拍') + (films.length ? ' · 拍过：' + films.map(function (f) { return '《' + esc(f.title) + '》' + (f.status === 'pulled' ? '（被抽查下架）' : f.status === 'withdrawn' ? '（撤了）' : ''); }).join('、') : '') + '</div></div>' +
       '<div class="rt">' + (PF ? '<button class="btn sm" data-act="profile" data-id="' + esc(c.id) + '">档案</button>' : '') +   // 女优档案（profile.js 在才有）
-      '<button class="btn sm" data-act="invite" data-id="' + c.id + '">请她进来聊聊</button><button class="btn sm" data-act="to-take" data-id="' + c.id + '">' + (identity(st) === '社长' ? '排练' : '试戏') + '</button></div></div>';
+      '<button class="btn sm" data-act="invite" data-id="' + c.id + '">请她进来聊聊</button><button class="btn sm" data-act="to-take" data-id="' + c.id + '">' + (identity(st) === '社长' ? '排练' : '试戏') + '</button>' +
+      (c.borrowed && identity(st) === '社长' ? '<button class="btn sm" data-act="poach-ask" data-id="' + esc(c.id) + '">挖过来</button>' : '') + '</div></div>';
   }
   function actorRow(a) {
     var apic = faceImg(a.name, 'av');   // 男优没有默认立绘：自己换了头像才有图；点小图就能换
@@ -9505,7 +9520,34 @@ var PIANCHANG_ONLINE = (function () {
     return '<div class="pc-row" data-pc-card="alumni" data-id="' + esc(c.id) + '"><div class="ph' + (pic ? ' has-img' : '') + '"' + (PF ? ' data-act="profile" data-id="' + esc(c.id) + '" title="看档案"' : '') + '><span>' + esc((c.stageName || '?').charAt(0)) + '</span>' + pic + '</div>' +
       '<div class="inf hd"><div class="nm2">' + esc(c.stageName) + tierTag(c.tier) + '</div><div class="rn">本名 ' + esc(c.realName) + ' · ' + c.age + ' 岁 · 银星映像的女优</div></div><div class="inf bd">' +
       '<div class="rn">借来拍过' + (films.length ? films.map(function (f) { return '《' + esc(f.title) + '》'; }).join('、') : '一部') + '，' + (c.backDay ? esc(C.mdShort(c.backDay)) + ' ' : '') + '回银星了。</div></div>' +
-      '<div class="rt">' + (PF ? '<button class="btn sm" data-act="profile" data-id="' + esc(c.id) + '">档案</button>' : '') + '</div></div>';
+      '<div class="rt">' + (PF ? '<button class="btn sm" data-act="profile" data-id="' + esc(c.id) + '">档案</button>' : '') + (identity(st) === '社长' ? '<button class="btn sm" data-act="poach-ask" data-id="' + esc(c.id) + '">挖过来</button>' : '') + '</div></div>';
+  }
+  // v0.1.31（亚伦：江蜜开场就说想当导演，能不能从银星挖过来、让她自导自演）：社长线把银星借来的人挖进公司。
+  //   转会费 = 一部片酬 × E.poachMul，付给银星。还借着的（第一部还没拍）当场留下；回了银星的从「借来过的」签回来，重新签约隔一天才能进棚（contractDay，signedDay 不动）。
+  //   挖过来的能导戏（canDirect）：开机时「导演位」能选她，她自己也演就是自导自演（core.dirActs）
+  function poachFee(c) { return Math.round((Number(c && c.fee) || 0) * (Number(E.poachMul) || 2) / 100) * 100; }
+  // 还借着的（在卡司里）/ 回了银星的（在「借来过的」里；那份记录上 borrowed 还留着，不能拿它分）
+  function poachable(st, id) {
+    if (identity(st) !== '社长') return null;
+    var c = st.dir.cast.find(function (x) { return x && x.id === id && x.borrowed; });
+    if (c) return { c: c, back: false };
+    c = arr(st.dir.alumni).find(function (x) { return x && x.id === id && !st.dir.cast.some(function (y) { return y && y.id === id; }); });
+    return c ? { c: c, back: true } : null;
+  }
+  async function poachDo(id) {
+    var st = readState(), p = poachable(st, id); if (!p) { UI.modal = null; render(); return; }
+    var c = p.c, fee = poachFee(c), back = p.back, name = c.stageName;
+    if (st.money < fee) { toast('warning', '账上不够：转会费 ' + money(fee) + '，账上 ' + money(st.money)); return; }
+    await save(function (s) {
+      var inCast = s.dir.cast.find(function (x) { return x && x.id === id; }), x = inCast || arr(s.dir.alumni).find(function (y) { return y && y.id === id; });
+      if (!x) return;
+      if (!inCast) { s.dir.alumni = arr(s.dir.alumni).filter(function (y) { return y && y.id !== id; }); s.dir.cast.push(x); x.contractDay = s.day; }
+      delete x.borrowed; delete x.backDay; x.poached = s.day; x.canDirect = true;
+      addLedger(s, 'poach', -fee, '从银星挖' + x.stageName + '（转会费，付给银星）');
+      addNews(s, x.stageName + '从银星挖过来了：转会费付给了戴晶，她签进公司，想自己导戏');
+    });
+    UI.modal = null; render();
+    toast('success', name + '签进公司了：开机时「导演位」也能让她导' + (back ? '；重新签的约，明天起能进棚' : ''));
   }
   // ── 导演 · 企划（剧本）──
   function scriptCard(rec, st, face) {
@@ -9666,9 +9708,11 @@ var PIANCHANG_ONLINE = (function () {
     h += '<div class="lbl">剧本' + (C.scFilterOn(UI.scf) ? '<span class="faint">（按企划页的筛选：' + shown.length + ' / ' + all.length + ' 份）</span>' : '') + '</div>' + C.scFilterBar(UI.scf, 'scf', scTagList(all)) + '<select data-sh="sid"><option value="">（挑一份：企划里写的，或者剧本库）</option>' + shown.map(function (r) { var s = parsed(r); return s ? '<option value="' + r.id + '"' + (r.id === UI.sh.sid ? ' selected' : '') + '>《' + esc(s.title) + '》' + esc(C.tierShort(s.tier)) + ' · ' + esc(s.lineup) + (C.isPovSc(s) ? ' · ' + esc(C.POV) : '') + ' · ' + esc(s.length || '') + ' · ' + s.scenes.length + '场' + ((s.tags || []).length ? ' · ' + esc(s.tags.slice(0, 3).join('/')) : '') + '</option>' : ''; }).join('') + '</select>';
     if (!sc) return h + '<div class="empty" style="margin-top:12px">先挑一份剧本。没有合适的，去「企划」随机写一份。</div>';
     h += '<div class="card" style="margin-top:10px"><div class="row">' + tierTag(sc.tier) + '<b>《' + esc(sc.title) + '》</b></div>' + scMetaHtml(sc) + '<div class="sub" style="margin-top:4px">' + esc(sc.head['卖点'] || '') + '</div><div class="faint">' + esc(sc.head['角色'] || '') + '</div></div>';
-    if (boss) {   // 导演位（社长线）：我自己导 / 请尹椿 / 请邱德海（一部 ¥3,000）
-      var dv = UI.sh.dirBy || 'self', fee = money(E.dirFee || 0);
-      h += '<div class="lbl">导演位</div><select data-shdir><option value="self"' + (dv === 'self' ? ' selected' : '') + '>我自己导（不花钱）</option><option value="尹椿"' + (dv === '尹椿' ? ' selected' : '') + '>请尹椿来导（' + esc(fee) + '）</option><option value="邱德海"' + (dv === '邱德海' ? ' selected' : '') + '>请邱德海来导（' + esc(fee) + '）</option></select>';
+    if (boss) {   // 导演位（社长线）：我自己导 / 请尹椿 / 请邱德海（一部 ¥3,000）/ 公司里能导戏的（挖过来的江蜜，同价）
+      var dv = UI.sh.dirBy || 'self', fee = money(E.dirFee || 0), dcs = dirCast(st);
+      h += '<div class="lbl">导演位</div><select data-shdir><option value="self"' + (dv === 'self' ? ' selected' : '') + '>我自己导（不花钱）</option><option value="尹椿"' + (dv === '尹椿' ? ' selected' : '') + '>请尹椿来导（' + esc(fee) + '）</option><option value="邱德海"' + (dv === '邱德海' ? ' selected' : '') + '>请邱德海来导（' + esc(fee) + '）</option>' +
+        dcs.map(function (c) { return '<option value="' + esc(c.stageName) + '"' + (dv === c.stageName ? ' selected' : '') + '>让' + esc(c.stageName) + '来导（' + esc(fee) + '；她也能同时演）</option>'; }).join('') + '</select>';
+      if (dcs.some(function (c) { return c.stageName === dv; }) && Object.keys(UI.sh.cast).some(function (k) { return UI.sh.cast[k] === dv; })) h += '<div class="faint" data-pc-selfdir style="margin-top:4px">🎬 ' + esc(dv) + '自导自演：她在镜头里演，也喊开机、喊卡，柯大河掌机，一条拍完去监视器回看。片酬和导演费都付。</div>';
     }
     h += '<div class="lbl">选角</div>';
     var bySc = forScriptCast(st, rec && rec.id);
@@ -9946,6 +9990,13 @@ var PIANCHANG_ONLINE = (function () {
     else if (m.kind === 'wrap') body = '<div class="eb">WRAP</div><h2 class="h">🎬 杀青？</h2><div class="sub">最后一场演完了就杀青。' + (dirLike(identity(st)) ? '片子进剪辑室，剪好就能在「市场」上架。' : '片酬进在途，' + E.payDelay + ' 天后到账。') + '</div><div class="act"><button class="btn" data-act="modal-x">再拍一会儿</button><button class="btn pri" data-act="wrap-ok">杀青</button></div>';
     else if (ON && String(m.kind).indexOf('ol-') === 0) body = ON.modalHtml(st, m);
     else if (m.kind === 'settings') body = renderSettings(st, m);
+    else if (m.kind === 'poach') {   // v0.1.31 挖角
+      var pp = poachable(st, m.id), pc = pp && pp.c, pfee = pc ? poachFee(pc) : 0, pok = !!pc && st.money >= pfee;
+      body = '<div class="eb">TRANSFER</div><h2 class="h">从银星挖' + esc(pc ? pc.stageName : '') + '</h2>' + (pc ? '<div class="sub">「银星不让我喊开机。你让我导，我就过来。」</div>' +
+        '<div class="sub">付银星转会费 <b>' + esc(money(pfee)) + '</b>（她一部片酬的 ' + (Number(E.poachMul) || 2) + ' 倍）。签进公司以后：拍片照她的价付片酬（一部 ' + esc(money(pc.fee)) + '）；开机时「导演位」能让她导（一部 ' + esc(money(E.dirFee || 0)) + '），她自己也演就是自导自演。' + (pp.back ? '重新签的约，隔一天才能进棚。' : '') + '</div>' +
+        (pok ? '' : '<div class="err">账上不够（账上 ' + esc(money(st.money)) + '）</div>') : '<div class="sub">她已经不在银星了。</div>') +
+        '<div class="act"><button class="btn" data-act="modal-x">算了</button><button class="btn pri" data-act="poach" data-id="' + esc(m.id) + '"' + (pok ? '' : ' disabled') + '>挖过来</button></div>';
+    }
     else if (m.kind === 'drop') body = '<div class="eb">CUT</div><h2 class="h">不拍了？</h2><div class="sub">这一部不拍完就收：已经花的钱回不来，' + (dirLike(identity(st)) ? '也不会出片。' : '片酬也没有。') + '</div><div class="act"><button class="btn" data-act="modal-x">接着拍</button><button class="btn red" data-act="sh-drop">收了</button></div>';
     else if (m.kind === 'rollback') body = rbModalHtml(st, m);   // v0.1.28：删楼 / 换回旧那版，片场的账撤不撤
     return '<div class="pc-modal" data-act="modal-bg"><div class="pc-dialog' + (m.kind === 'settings' ? ' pc-set' : '') + '">' + body + '</div></div>';
@@ -10240,6 +10291,8 @@ var PIANCHANG_ONLINE = (function () {
       case 'cand-sign': UI.modal = { kind: 'sign', id: id }; render(); var si = PANEL.querySelector('#pc-stage-in'); if (si) si.focus(); break;
       case 'sign-ok': { var inp = PANEL.querySelector('#pc-stage-in'); signCand(id, inp ? inp.value : ''); break; }
       case 'invite': inviteIn(id); break;
+      case 'poach-ask': UI.modal = { kind: 'poach', id: id }; render(); break;
+      case 'poach': poachDo(id); break;
       case 'to-take': UI.tk.tid = id; UI.tab = 'take'; lsSet(TAB_KEY, UI.tab); render(); break;
       case 'profile': if (PF) { UI.profile = id; render(); } break;   // 女优档案：盖在面板上的一整层（.pc-pfhost）
       // 企划
@@ -10930,7 +10983,7 @@ var PIANCHANG_ONLINE = (function () {
   var RB_NAV = { close: 1, 'theme-open': 1, 'theme-close': 1, 'theme-set': 1, settings: 1, 'set-save': 1, 'key-clear': 1, 'llm-test': 1, 'llm-models': 1, 'tips-again': 1, 'tips-ok': 1, 'modal-x': 1, 'modal-bg': 1,
     ledger: 1, 'cal-prev': 1, 'cal-next': 1, endday: 1, skip: 1, 'to-co': 1, 'co-rename': 1, 'co-rename-x': 1, 'cast-script': 1, 'cs-call': 1, 'tk-mode': 1, 'tk-who': 1, 'tk-n': 1, 'mk-pov': 1, scf: 1,
     profile: 1, 'to-take': 1, 'gen-open': 1, 'idea-open': 1, 'gen-mode': 1, 'gen-tier': 1, 'idea-pov': 1, 'idea-len': 1, 'gen-toku': 1, 'gen-draw': 1, 'custom-open': 1, 'custom-pull': 1, 'sc-view': 1, 'sc-edit': 1, 'sc-take': 1, 'sc-shoot': 1,
-    'cand-sign': 1, 'sh-drop-ask': 1, 'wb-retry': 1, 'sc-post': 1, 'rb-ok': 1, 'rb-keep': 1 };
+    'cand-sign': 1, 'sh-drop-ask': 1, 'poach-ask': 1, 'wb-retry': 1, 'sc-post': 1, 'rb-ok': 1, 'rb-keep': 1 };
   var RB_DDX = { flush: 1, send: 1, stk: 1, 'tf-go': 1, 'vc-go': 1, reroll: 1, recall: 1, claim: 1, inv: 1, call: 1, 'c-popok': 1, 'c-roll': 1, 'c-hang': 1, 'set-clear': 1 };
   function touchAct(e) {
     var t = e.target; if (!t || !t.closest) return;
@@ -10946,7 +10999,7 @@ var PIANCHANG_ONLINE = (function () {
   // ═════════════════════════ 叮叮（dingding.js）：柯大河置顶 ═════════════════════════
   function staffOf(s) { var id = identity(s); return (id === '男优' ? L.staffAct : id === '社长' ? (L.staffCo || L.staffDir) : L.staffDir) || []; }
   function ddRoster(s) {
-    if (dirLike(identity(s))) return s.dir.cast.map(function (c) { return { id: c.id, name: c.stageName, realName: c.realName, stageName: c.stageName, sub: (c.borrowed ? '银星借来的女优' : '签约女优') + ' · 本名' + c.realName, portrait: C.portraitOk(c.portrait) ? c.portrait : null, kind: 'talent', ref: c }; })
+    if (dirLike(identity(s))) return s.dir.cast.map(function (c) { return { id: c.id, name: c.stageName, realName: c.realName, stageName: c.stageName, sub: (c.borrowed ? '银星借来的女优' : c.poached ? '从银星挖来的女优 · 也能导戏' : '签约女优') + ' · 本名' + c.realName, portrait: C.portraitOk(c.portrait) ? c.portrait : null, kind: 'talent', ref: c }; })
       .concat(arr(s.dir.alumni).filter(function (c) { return c && !s.dir.cast.some(function (x) { return x && x.id === c.id; }); }).map(function (c) { return { id: c.id, name: c.stageName, realName: c.realName, stageName: c.stageName, sub: '银星的女优 · 借来拍过一部', portrait: C.portraitOk(c.portrait) ? c.portrait : null, kind: 'talent', ref: c }; }));
     var seen = {}, out = [];
     s.act.films.forEach(function (f) { if (f.costar && !seen[f.costar]) { seen[f.costar] = 1; var c0 = L.cast0.find(function (x) { return x.stageName === f.costar; }); out.push({ id: 'co_' + f.costar, name: f.costar, realName: c0 ? c0.realName : f.costar, stageName: f.costar, sub: '搭过戏 · 女优', portrait: (L.npcPortrait || {})[f.costar] || null, kind: 'talent', ng: c0 && c0.ng, xp: c0 && c0.xp, line: c0 && c0.line, age: c0 && c0.age }); } });
