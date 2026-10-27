@@ -3257,10 +3257,10 @@ var PIANCHANG_DD = (function () {
       if (out.some(function (c) { return c.id === id; })) return;
       var a = d.added[id] || {};
       var r = a.kind === 'met' ? (s.met || []).find(function (x) { return x && 't_' + x.id === id; }) : null;
-      out.push({ id: id, name: a.name || (r && (r.name || r.stageName || r.realName)) || id, sub: a.kind === 'met' ? '见过 · 小柯给的联系方式' : (a.sub || '小柯给的联系方式'), kind: r ? 'met' : 'free', ref: r || null });
+      out.push({ id: id, name: a.name || (r && (r.name || r.stageName || r.realName)) || id, sub: a.kind === 'met' ? '见过 · 小柯给的联系方式' : (a.sub || '小柯给的联系方式'), kind: r ? 'met' : a.kind === 'visitor' ? 'visitor' : 'free', ref: r || null });   // v0.1.27：正文里加了叮叮的人也记在 added（kind: 'visitor'）
     });
     Object.keys(d.h || {}).forEach(function (id) {   // 主动找上门的圈里人
-      if (id.indexOf('n_') !== 0 || out.some(function (c) { return c.id === id; })) return;
+      if (id.indexOf('n_') !== 0 || !(d.h[id] || []).length || out.some(function (c) { return c.id === id; })) return;   // v0.1.27：重 roll 收回以后只剩空记录的，不算
       var nm = id.slice(2), vis = Lx().visitors;
       out.push({ id: id, name: nm, sub: (vis && vis[nm]) ? '圈里的人' : '找过你的人', kind: 'visitor' });
     });
@@ -3527,8 +3527,18 @@ var PIANCHANG_DD = (function () {
       }).filter(function (l) { return l.length > 4; }).join('\n');
     } catch (e) { return ''; }
   }
-  // 最近 8 楼只留字、不带「正文：」「U：」行头：查某个名字在正文里出没出过场用
-  async function storyText() { return (await mainContext()).replace(new RegExp('^(?:正文|' + escRe(uc()) + ')：', 'gm'), ''); }
+  // 查某个名字「出没出过场」用：最近 40 楼整楼的字（洗过、不截断）+ 叮叮里已有的聊天
+  //   v0.1.27（crazyman2333「加好友还是没生效」）：以前借 mainContext 读，只看 8 楼、每楼只留前 2000 字——正文一长，当面加叮叮那句在后半截，名字查不到，人就加不上
+  var SEEN_FLOORS = 40;
+  async function storyText() {
+    try {
+      var last = Number(getLastMessageId()); if (!(last >= 0)) return '';
+      var msgs = await getChatMessages(Math.max(0, last - SEEN_FLOORS + 1) + '-' + last, { hide_state: 'all' });
+      return (msgs || []).map(function (m) { return m ? washFloor(m.message) : ''; }).join('\n');
+    } catch (e) { return ''; }
+  }
+  function ddText(s) { var h = dd(s).h || {}; return Object.keys(h).map(function (id) { return (h[id] || []).map(function (m) { return (m && (m.text || m.note)) || ''; }).join('\n'); }).join('\n'); }
+  async function seenText(s) { return (await storyText()) + '\n' + ddText(s); }
   // 最新一条 AI 楼的正文（洗过），判断谁「在场」用
   async function floorText(mesId) {
     try { var ms = await getChatMessages(String(mesId)); var m = ms && ms[0]; return m && m.role === 'assistant' ? washFloor(m.message) : ''; } catch (e) { return ''; }
@@ -3557,9 +3567,12 @@ var PIANCHANG_DD = (function () {
   }
   function phoneRule(s) {
     var U = uc(s);
-    return '【' + APP + '】正文里有人此刻会在' + APP + '上给' + U + '发消息（人不在跟前、事后想起来、要报信，或者刚和' + U + '当面加了' + APP + '、发一句打招呼），就在这条回复的最后另起几行写：\n' +
+    // v0.1.27（crazyman2333「加好友还是没生效」）：当面加叮叮从括号里的「可以」改成「一定要写」，名字跟正文写法对齐（脚本按名字查这个人在正文里出没出过场）
+    return '【' + APP + '】正文里有人此刻会在' + APP + '上给' + U + '发消息（人不在跟前、事后想起来、要报信），就在这条回复的最后另起几行写：\n' +
       '<!--' + APP + '\n名字：消息\n-->\n' +
-      '一行一条，最多三条，名字写全名，消息像真人打字一样短；' + U + '自己发的不写；没有就整段不写。拉黑过' + U + '的人在正文里明确和好了，可以写「名字：(解除拉黑)」。';
+      '一行一条，最多三条，名字用正文里写过的全名、一字不差，消息像真人打字一样短；' + U + '自己发的不写；没有就整段不写。' +
+      '这一轮正文里有人刚和' + U + '当面加了' + APP + '（扫码、交换号码），这一段一定要写，让这个人发一句打招呼：' + U + '的' + APP + '通讯录只认这一段，不写就加不上。' +
+      '拉黑过' + U + '的人在正文里明确和好了，可以写「名字：(解除拉黑)」。';
   }
   function lastTs(h) { var m = (h || [])[(h || []).length - 1]; return (m && m.ts) || 0; }
   function refreshInjection() {
@@ -4356,7 +4369,7 @@ var PIANCHANG_DD = (function () {
     var had = contactByName(n, s) || (met && findChat('t_' + met.id, s));
     if (had) return { id: had.id, name: had.name, had: true };
     if (met) return { id: 't_' + met.id, name: met.realName || met.name, info: { kind: 'met', name: met.realName || met.name } };
-    if (String(ask || '').indexOf(n) >= 0 || await wbNpc(n) || (await storyText()).indexOf(n) >= 0) return { id: 'n_' + n, name: n, info: { kind: 'free', name: n } };
+    if (String(ask || '').indexOf(n) >= 0 || await wbNpc(n) || (await seenText(s)).indexOf(n) >= 0) return { id: 'n_' + n, name: n, info: { kind: 'free', name: n } };   // v0.1.27：正文整楼 40 楼 + 叮叮里聊到过的都算出过场
     return null;
   }
   async function applyReply(id, c, res, o) {
@@ -4836,7 +4849,7 @@ var PIANCHANG_DD = (function () {
   function quietNow(s) { try { return !!(C.quiet && C.quiet(s || st())); } catch (e) { return false; } }
   function isOn(k) { return cfg()[k] !== false; }
   // 正文里的名字 → 联系人（全名、艺名、本名、小柯都认）；通讯录里没有、但世界书里有【npc】条目的人，按「找过你的人」开个会话
-  //   story（最近的正文，洗过、不含 <!--叮叮--> 块）：正文里现编出来、没有条目的人，只要正文里出过场也认（10-26：正文里当面加了叮叮的人发不进来）
+  //   story（seenText：最近 40 楼整楼的正文，洗过、不含 <!--叮叮--> 块，加叮叮记录）：正文里现编出来、没有条目的人，只要出过场也认（10-26：正文里当面加了叮叮的人发不进来）
   async function chatForName(name, s, story) {
     var n = String(name || '').replace(/[\[\]【】「」*]/g, '').trim(); if (!n || n.length > 12) return null;
     var c = contactByName(n, s); if (c) return c;
@@ -4848,13 +4861,14 @@ var PIANCHANG_DD = (function () {
     var m = ms && ms[0]; if (!m || m.role !== 'assistant') return 0;
     var txt = String(m.message || ''), blocks = [], mm, re = new RegExp(PHONE_CMT_RE.source, 'gi');
     while ((mm = re.exec(txt))) blocks.push(mm[1] || '');
-    var s = st(), U = uc(s), userRe = userLineRe(s), t = stamp(s), land = {}, order = [], n = 0, story = blocks.length ? await storyText() : '';
+    var s = st(), U = uc(s), userRe = userLineRe(s), t = stamp(s), land = {}, order = [], n = 0, story = blocks.length ? await seenText(s) : '';   // v0.1.27：整楼 40 楼 + 叮叮记录（以前 8 楼 × 前 2000 字）
     for (var b = 0; b < blocks.length; b++) {
       var lines = String(blocks[b]).split('\n');
       for (var i = 0; i < lines.length && n < 3; i++) {
         var line = lines[i].replace(/^\s*[-•·]\s*/, '').trim(); if (!line || userRe.test(line)) continue;
         var k = line.search(/[:：|｜]/); if (k <= 0 || k > 12) continue;
-        var c = await chatForName(line.slice(0, k), s, story); if (!c || c.group) continue;
+        var c = await chatForName(line.slice(0, k), s, story); if (!c) { try { console.warn('[叮叮] 正文里的叮叮消息对不上人（正文和叮叮里都没出过场）：', line.slice(0, k)); } catch (e) {} continue; }
+        if (c.group) continue;
         var body = line.slice(k + 1).trim(); if (!body) continue;
         if (blockedOf(c.id, s) && !/^[\(（]\s*解除拉黑\s*[\)）]$/.test(body)) continue;   // 拉黑了 U 的人：只认「解除拉黑」
         var msg = parseNpcLine(body, c, c.name, t); if (!msg || msg.kind === 'card') continue;
@@ -4869,9 +4883,12 @@ var PIANCHANG_DD = (function () {
       if (reroll) Object.keys(s2.dd.h || {}).forEach(function (id) {   // 重 roll 了这一楼：上一版这一楼送来的消息收回
         var h = s2.dd.h[id] || [], keep = h.filter(function (x) { return x.fromFloor !== mesId; });
         if (keep.length !== h.length) { var gone = h.length - keep.length; s2.dd.h[id] = keep; s2.dd.u[id] = Math.max(0, (Number(s2.dd.u[id]) || 0) - gone); s2.dd.f[id] = Math.min(Number(s2.dd.f[id]) || 0, keep.length); }
+        var ad = (s2.dd.added || {})[id]; if (ad && ad.fromFloor === mesId && !keep.length) delete s2.dd.added[id];   // 这一楼加进来的人，重 roll 掉了也收回
       });
       order.forEach(function (id) {
         land[id].msgs.forEach(function (x) { if (x.kind === 'block' || x.kind === 'unblock') { if (!s2.dd.bl) s2.dd.bl = {}; s2.dd.bl[id] = { on: x.kind === 'block', day: s2.day, time: x.time, why: x.text || '' }; } });
+        // v0.1.27（crazyman2333「加好友还是没生效」）：正文里新来的人记进通讯录（added），不再只靠聊天记录撑着——设置里「清空叮叮记录」写着「联系人留着」，以前一清就没了
+        if (land[id].c.kind === 'visitor' && !(s2.dd.added || {})[id]) addContact(s2, id, { name: land[id].c.name, kind: 'visitor', sub: land[id].c.sub || '找过你的人', fromFloor: mesId });
         pushMsgs(s2, id, land[id].msgs, viewing(id));
       });
     });
