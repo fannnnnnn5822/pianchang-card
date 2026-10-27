@@ -4936,8 +4936,10 @@ var PIANCHANG_DD = (function () {
   // 对方输出的一行 → 消息（转账 / 语音 / 收款 / 拉黑 / 表情包，其余当文字）
   function parseNpcLine(line, c, sender, t) {
     var m, base = Object.assign({ id: mid() + Math.floor(Math.random() * 1000), sender: c.id, senderName: sender || c.name }, t);
-    if ((m = line.match(/^[\(（]?\s*转账\s*\+?\s*[¥￥]?\s*(\d+(?:\.\d+)?)\s*(?:[|｜:：]\s*(.*?))?\s*[\)）]?$/))) {
-      return Object.assign(base, { kind: 'transfer', amount: Math.min(capOf(c), Math.max(1, Math.round(parseFloat(m[1])))), note: String(m[2] || '').slice(0, 20), opened: false, text: '' });
+    // v0.1.37（亚伦：尹椿写成「(转账-50000|…)」，多个减号就当成一句普通话，账本里没钱）：加号、减号、竖线、冒号、¥、千分位逗号、「5万」都认
+    if ((m = line.match(/^[\(（]?\s*转账\s*(?:[+\-－|｜:：]\s*)?[¥￥]?\s*([\d,，]+(?:\.\d+)?)\s*(万)?\s*(?:元|块)?\s*(?:[|｜:：，,]\s*(.*?))?\s*[\)）]?$/))) {
+      var amt0 = parseFloat(m[1].replace(/[,，]/g, '')) * (m[2] ? 10000 : 1);
+      return Object.assign(base, { kind: 'transfer', amount: Math.min(capOf(c), Math.max(1, Math.round(amt0) || 1)), note: String(m[3] || '').slice(0, 20), opened: false, text: '' });
     }
     if ((m = line.match(/^[\(（]?\s*语音\s*[|｜:：+]\s*(.+?)\s*[\)）]?$/))) return Object.assign(base, { kind: 'voice', text: m[1].slice(0, 160), secs: voiceSecs(m[1]) });
     if (c.kind === 'K' && (m = line.match(/^[\(（]\s*推名片\s*[|｜:：]\s*(.+?)\s*[\)）]$/))) return Object.assign(base, { kind: 'card', text: m[1].replace(/[\[\]【】「」《》*]/g, '').trim() });   // 只在 applyReply 里认，不落档
@@ -5008,7 +5010,7 @@ var PIANCHANG_DD = (function () {
   function knowRules(who, U) { return OMNI_RULES(who, U); }
   function rich(U, priv) {
     return '- 想发表情包：单独一行写 <bqb>表情包名</bqb>，可选：' + stickerHint(30) + '\n' +
-      '- 转账：单独一行写 (转账+金额|留言)，金额是整数；符合人设和情境才发，比如报销、给定金、请客。\n' +
+      '- 转账：单独一行写 (转账|金额|留言)，比如 (转账|3000|打车钱报了)，金额是整数；符合人设和情境才发，比如报销、给定金、请客。\n' +
       '- 语音：单独一行写 (语音|要说的话)，话要像嘴上说的，可以更随意。\n' +
       '- ' + U + '给你转了账、你收下：单独一行写 (收款)。\n' +
       (priv ? '- 真被' + U + '惹急了、不想再理' + U + '：单独一行写 (拉黑|一句理由)。写了以后' + U + '的消息就送不到你这里，所以只在人设和剧情真走到这一步时用；已经拉黑、剧情里又明确和好了，单独一行写 (解除拉黑) 再接着说。\n' : '');
@@ -5056,7 +5058,7 @@ var PIANCHANG_DD = (function () {
       '- 谁会接这句谁说；可以互相接梗、抬杠，一个人连发两条也行。\n' +
       '- 每条 35 字以内，像真人在群里打字。\n' +
       '- 表情包写「名字：<bqb>表情包名</bqb>」，可选：' + stickerHint(20) + '\n' +
-      '- 转账写「名字：(转账+金额|留言)」，语音写「名字：(语音|内容)」，收' + U + '的转账写「名字：(收款)」；合适时才用。\n' +
+      '- 转账写「名字：(转账|金额|留言)」，语音写「名字：(语音|内容)」，收' + U + '的转账写「名字：(收款)」；合适时才用。\n' +
       '- 只写群成员的消息；' + U + '说什么由' + U + '自己发。\n' +
       '直接输出消息。';
   }
@@ -5653,7 +5655,19 @@ var PIANCHANG_DD = (function () {
     ['h', 'q', 'u', 'f', 'calls', 'added', 'bl', 'amb'].forEach(function (k) { if (!d[k] || typeof d[k] !== 'object' || Array.isArray(d[k])) d[k] = {}; });
     if (!Array.isArray(d.evk)) d.evk = [];
     try { mergeAlias(d, s); } catch (e) {}
+    try { fixTransfers(d, s); } catch (e) {}
     return s;
+  }
+  // v0.1.37：以前没认出来、当成一句话存着的「(转账-50000|…)」读档时改回转账（没收的那种，点一下收款；金额照单笔上限）
+  function fixTransfers(d, s) {
+    Object.keys(d.h).forEach(function (id) {
+      if (id.indexOf('g_') === 0) return;   // 群里的钱不走
+      (d.h[id] || []).forEach(function (m) {
+        if (!m || m.sender === 'user' || (m.kind && m.kind !== 'text') || !/^\s*[\(（]?\s*转账/.test(String(m.text || ''))) return;
+        var x = parseNpcLine(String(m.text).trim(), findChat(id, s) || { id: id, kind: 'visitor' }, m.senderName, {});
+        if (x && x.kind === 'transfer') { m.kind = 'transfer'; m.amount = x.amount; m.note = x.note; m.opened = false; m.text = ''; }
+      });
+    });
   }
   function mergeAlias(d, s) {
     var ids = Object.keys(d.h).concat(Object.keys(d.added)).filter(function (id, i, a) { return id.indexOf('n_') === 0 && a.indexOf(id) === i; });
