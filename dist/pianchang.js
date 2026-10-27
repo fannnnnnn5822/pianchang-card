@@ -3926,7 +3926,7 @@ var PIANCHANG_DD = (function () {
       return (intro ? intro + '\n' : '') + (wb ? wb + '\n' : '') + (Array.isArray(pb) ? pb.join('\n') : String(pb || ''));
     }
     var L = Lx();
-    var extra = c.kind === 'K' ? '\n（' + K_NAME + '能做的：提醒、出主意、去要别人的联系方式——要到了，就在消息最后单独一行写 (推名片|那个人的全名)，' + uc(s) + '的' + APP + '通讯录里就有了这个人；面板里的事——排片、开机、记账——他替' + uc(s) + '点不了，只能提醒。）' : '';
+    var extra = c.kind === 'K' ? '\n（' + K_NAME + '能做的：提醒、出主意、去要别人的联系方式——要到了，就在消息最后单独一行写 (推名片|那个人的全名)，名字照正文里的写法一字不差，不加「小姐」「那个」之类，' + uc(s) + '的' + APP + '通讯录里就有了这个人；' + uc(s) + '没说要谁的，就先问一句是哪个；面板里的事——排片、开机、记账——他替' + uc(s) + '点不了，只能提醒。）' : '';
     if (c.kind === 'K' || c.kind === 'staff') return ((wb || (L.staff && L.staff[c.name]) || '') + extra).trim();
     if (wb) return wb;
     if (c.kind === 'visitor' && L.visitors && L.visitors[c.name]) return L.visitors[c.name];
@@ -4558,7 +4558,7 @@ var PIANCHANG_DD = (function () {
     h += groups(s).map(function (g) { return itemHtml(Object.assign({ group: true }, g), s); }).join('');
     if (talk.length) h += '<div class="dd-sec">最近</div>' + talk.map(function (c) { return itemHtml(c, s); }).join('');
     if (quiet.length) h += '<div class="dd-sec">通讯录</div>' + quiet.map(function (c) { return itemHtml(c, s); }).join('');
-    h += '<div class="dd-sec" style="font-weight:400;letter-spacing:0;line-height:1.6">签了约、搭过戏的人自动进通讯录。正文里碰见的人，跟小柯说一声「把联系方式给我」，他去要。</div>';
+    h += '<div class="dd-sec" style="font-weight:400;letter-spacing:0;line-height:1.6">签了约、搭过戏的人自动进通讯录。正文里碰见的人，跟小柯说「把某某的联系方式给我」，名字照正文里的写，他去要。</div>';
     ROOT.innerHTML = h + '</div>';
     rendered();
   }
@@ -4824,7 +4824,24 @@ var PIANCHANG_DD = (function () {
   var CONTACT_ASK = /联系方式|微信|加.{0,4}(联系人|好友)|号码|叮叮|盯盯/;
   // 小柯推过来的名片 → 通讯录里的人（10-26 玩家报：小柯答应了、通讯录没进人）
   //   面试见过的接回原档案 t_<id>；别的人只要世界书里有、或者要联系方式那句话 / 最近的正文里提过名字，就开 n_<名字>（人设照 personaOf 的兜底读正文）
+  // v0.1.35（亚伦：跟小柯说了，叮叮里还是没加上）：模型写名片常带尾巴（「林小雪小姐」「咖啡店的林小雪」「林小雪，楼下那个」），原样对不上就剥掉再认一次
+  function cardName(t) {
+    var n = String(t || '').replace(/[\[\]【】「」《》*"'“”]/g, '').trim();
+    n = n.split(/[，,、；;（(]/)[0].trim();
+    var j = n.lastIndexOf('的'); if (j >= 0 && j < n.length - 2) n = n.slice(j + 1);
+    var k = n.lastIndexOf('那个'); if (k >= 0 && k < n.length - 3) n = n.slice(k + 2);
+    return n.replace(/(小姐|先生|老师|女士|同学|姐姐|哥哥|大姐|大哥|妹妹|弟弟|酱|桑|那个人|那位)$/, '').trim();
+  }
   async function cardTarget(name, s, ask) {
+    var raw = String(name || '').trim(), t = await cardTarget0(raw, s, ask);
+    if (t) return t;
+    var n = cardName(raw);
+    return n && n !== raw ? cardTarget0(n, s, ask) : null;
+  }
+  // 要联系方式那句话里点了谁：「把林小雪的联系方式给我」「帮我要一下林小雪的叮叮」
+  var ASK_NAME_RE = /([^\s，。！？、,.!?：:「」]{2,10}?)(?:的)(?:联系方式|微信|号码|电话|叮叮|盯盯)/g;
+  function askNames(t) { var out = [], m; ASK_NAME_RE.lastIndex = 0; while ((m = ASK_NAME_RE.exec(String(t || '')))) { m[1].replace(/^(?:把|帮我|帮忙|麻烦你?|去|问|要|给我|我要|一下)+/, '').split(/和|跟|与|还有|以及/).forEach(function (x) { var n = cardName(x); if (n.length >= 2 && out.indexOf(n) < 0) out.push(n); }); } return out; }
+  async function cardTarget0(name, s, ask) {
     var n = String(name || '').trim(); if (n === K_NICK) n = K_NAME;
     if (n.length < 2 || n.length > 12 || n === uc(s)) return null;
     var met = (s.met || []).find(function (m) { return m && [m.realName, m.name, m.stageName].indexOf(n) >= 0; });
@@ -4840,14 +4857,28 @@ var PIANCHANG_DD = (function () {
     if (c.kind === 'K') {
       var s0 = st(), cards = res.filter(function (m) { return m.kind === 'card'; });
       res = res.filter(function (m) { return m.kind !== 'card'; });
+      var missed = [], hadAny = false;
       for (var ci = 0; ci < cards.length; ci++) {
         var tg = await cardTarget(cards[ci].text, s0, o.ask);
-        if (!tg) { try { console.warn('[叮叮] 小柯推的名片对不上人：', cards[ci].text); } catch (e) {} }
-        else if (!tg.had && !gave.some(function (g) { return g.id === tg.id; })) gave.push(tg);
+        if (!tg) { missed.push(cards[ci].text); try { console.warn('[叮叮] 小柯推的名片对不上人：', cards[ci].text); } catch (e) {} }
+        else if (tg.had) hadAny = true;
+        else if (!gave.some(function (g) { return g.id === tg.id; })) gave.push(tg);
       }
-      if (!cards.length && !kViaMain() && o.ask && CONTACT_ASK.test(o.ask)) {   // 他忘了写名片那一行：「把联系方式给我」里点了名的面试新人照旧给
+      var asked = !o.initiate && !kViaMain() && o.ask && CONTACT_ASK.test(o.ask);
+      if (!cards.length && asked) {   // 他忘了写名片那一行：「把联系方式给我」里点了名的面试新人照旧给
         var who = (s0.met || []).find(function (m) { return m && (m.realName || m.name) && o.ask.indexOf(m.realName || m.name) >= 0; });
         if (who && !contacts(s0).some(function (x) { return x.id === 't_' + who.id; })) gave.push({ id: 't_' + who.id, name: who.realName || who.name, info: { kind: 'met', name: who.realName || who.name } });
+      }
+      // v0.1.35：名片没写或者对不上，就照玩家那句话里点的名字补（正文 40 楼、叮叮、世界书里出现过才加）
+      if (asked && !gave.length && !hadAny) {
+        var an = askNames(o.ask);
+        for (var ai = 0; ai < an.length; ai++) { var t2 = await cardTarget(an[ai], s0, ''); if (t2 && t2.had) hadAny = true; else if (t2 && !gave.some(function (g) { return g.id === t2.id; })) gave.push(t2); }
+      }
+      // 还是加不上：以前一声不吭，玩家以为要多聊几楼
+      if (asked && !gave.length && !hadAny) {
+        if (missed.length) C.toast('info', K_NICK + '推的名片「' + missed[0] + '」对不上人：正文最近 40 楼和' + APP + '里都没见过这个名字。照正文里的写法再跟他说一次名字');
+        else if (!askNames(o.ask).length) C.toast('info', K_NICK + '不知道要谁的：跟他说的时候带上名字，比如「把某某的联系方式给我」，名字照正文里的写');
+        else C.toast('info', '「' + askNames(o.ask)[0] + '」在正文最近 40 楼和' + APP + '里都没出现过，' + K_NICK + '要不到。名字照正文里的写法再说一次');
       }
     }
     await C.save(function (s2) {
