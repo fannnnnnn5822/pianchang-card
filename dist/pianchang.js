@@ -271,12 +271,12 @@ var PIANCHANG_LISTS = {
   //   代码抽、不花请求。每条 [文字, 权重]：常见 4 / 少见 2 / 稀有 1 / 离谱 0.5。片酬按「部」算（跟现有四位一样）
   maleGacha: {
     grade: [   // 性能档（男优版「鉴定」）：名字、一句、权重、一部片酬区间
-      { g: 'D', name: '气氛组', t: '全组架着机器等他，药钱比盒饭贵', w: 12, fee: [500, 1200] },
-      { g: 'C', name: '走量工', t: '规规矩矩干完，不拖也不出彩', w: 32, fee: [1500, 2200] },
+      { g: 'D', name: '气氛组', t: '全组架着机器等他，药钱比盒饭还贵', w: 12, fee: [500, 1200] },
+      { g: 'C', name: '走量工', t: '干完就走，不拖后腿，也别指望他出彩', w: 32, fee: [1500, 2200] },
       { g: 'B', name: '铁饭碗', t: '喊开始就硬，喊卡就停', w: 32, fee: [2300, 3200] },
-      { g: 'A', name: '镇场桩', t: '一天连赶三组，女优不在状态他能带起来', w: 18, fee: [3300, 4500] },
+      { g: 'A', name: '镇场桩', t: '一天赶三组不带喘，女优没状态他也能带起来', w: 18, fee: [3300, 4500] },
       { g: 'S', name: '液压机', t: '导演喊出来，绝不差半秒', w: 5, fee: [4600, 6500] },
-      { g: 'SS', name: '永动机', t: '连拍五场不用歇，拍完还帮场务扛轨道车', w: 1, fee: [6500, 8000] },
+      { g: 'SS', name: '永动机', t: '连拍五场不歇，收工还帮场务扛轨道车', w: 1, fee: [6500, 8000] },
     ],
     ability: [
       ['读秒发射：导演倒数三二一就出来', 1], ['三分钟交货：进去两分钟就得喊卡', 4], ['镜头怯场：红灯一亮就软', 4], ['无限弹仓：一场能实打实出三次', 1],
@@ -385,12 +385,12 @@ var PIANCHANG_LISTS = {
   //   钩子（profile.js drawBody 照着改签约后的档案）：rk 评级定死 / rkMin 至少 / rkMax 至多 / lac 会出奶 / sp 特殊构造 / hy:0 不是第一次
   femGacha: {
     grade: [   // 片场性能档（女优版「鉴定」）：只上卡面，不进钱；跟档案里的私处评级两回事
-      { g: 'D', name: '耗材王', t: '全组等她酝酿情绪，润滑液用掉半箱还没拍完第一场', w: 12 },
-      { g: 'C', name: '打卡族', t: '给多少钱干多少活，叫声像复读机，到点收工', w: 32 },
-      { g: 'B', name: '省心丸', t: '走位准、反应快，不挑搭档不挑棚，一条过', w: 32 },
-      { g: 'A', name: '救场王', t: '男优怯场她能哄起来，连拍三场不掉妆', w: 18 },
-      { g: 'S', name: '印钞机', t: '导演喊三二一就到，拍她从不超时', w: 5 },
-      { g: 'SS', name: '榨汁仙', t: '连轴十小时越战越勇，三个男优扶墙出去，她还在问盒饭吃啥', w: 1 },
+      { g: 'D', name: '耗材王', t: '全组干等她进状态，润滑液用了半箱，第一场还没拍完', w: 12 },
+      { g: 'C', name: '打卡族', t: '给多少拍多少，六点一到人就走了', w: 32 },
+      { g: 'B', name: '省心丸', t: '跟谁搭都行，大多一条就过', w: 32 },
+      { g: 'A', name: '救场王', t: '男优一怯场，导演第一个喊她来救', w: 18 },
+      { g: 'S', name: '印钞机', t: '导演喊三二一她就到，拍她从来不超时', w: 5 },
+      { g: 'SS', name: '榨汁仙', t: '拍了十个钟头，三个男优扶着墙出去，她在问盒饭吃什么', w: 1 },
     ],
     phys: [   // 体质
       ['喷水机：一到就往外飙，摄影师穿雨衣', 2, 1.6, { rkMin: 'B' }], ['喷奶机：没在哺乳期，一激动就往外滋', 2, 0.8, { lac: 1 }],
@@ -1711,6 +1711,8 @@ var PIANCHANG_CORE = (function () {
     if (rndFloat() < 0.3 && (MG.sig || []).length) m.sig = pick(MG.sig);
     return m;
   }
+  // 性能档的说明：按档位从 lists 现查（改了说明，老存档也跟着换）；查不到用存着的
+  function gradeLine(p, fem) { var g = ((fem ? (L.femGacha || {}).grade : MG.grade) || []).find(function (x) { return p && x.g === p.gradeKey; }); return g ? g.t : (p && p.gradeText) || ''; }
   function drawMen(n, usedSurnames) {
     var out = [], used = (usedSurnames || []).slice(), seen = {};
     for (var i = 0; i < n; i++) { var m = drawMan(used, seen); used.push(m.surname); out.push(m); }
@@ -1718,7 +1720,7 @@ var PIANCHANG_CORE = (function () {
   }
   // 签了的男优给正文的那几行（身体另走 profile.js maleLine）；招牌台词不进（免得变口头禅）
   function manLines(m) {
-    return [(m.grade ? '性能：' + m.grade + (m.gradeText ? '（' + m.gradeText + '）' : '') + (m.ability ? '；' + m.ability : '') : ''),
+    return [(m.grade ? '组里叫他「' + m.grade + '」：' + gradeLine(m, false) + (m.ability ? '；' + m.ability : '') : ''),
       m.mark ? '身上：' + m.mark : '', m.bed ? '床上：' + m.bed : '', (m.xp || []).length ? 'XP：' + (m.xp || []).join('；') : '', (m.ng || []).length ? 'NG：' + (m.ng || []).join('；') : '',
       m.talk ? '说话：' + m.talk : '', m.quirk ? '小动作：' + m.quirk : '', m.past ? '入行前：' + m.past : '', m.motive ? '为什么来：' + m.motive : '', m.stuck ? '卡在哪：' + m.stuck : '', m.family ? '家里：' + m.family : ''].filter(Boolean);
   }
@@ -1863,13 +1865,13 @@ var PIANCHANG_CORE = (function () {
     if (p.tier) a.push('能接的尺度：' + p.tier);
     if (p.motive) a.push('为什么来：' + p.motive);
     if (p.line) a.push('一句话：' + p.line);
-    if (g.want) a.push('人话：' + g.want);
+    if (g.want) a.push('心里话：' + g.want);
     if (g.skill && !p.skill) a.push('本事：' + g.skill);
     if (g.stuck && !p.stuck) a.push('卡在哪：' + g.stuck);
     ncLines(p).forEach(function (x) { a.push(x); });   // 抽签池那几层（v0.1.6 起的新人才有）
     if (p.talk && (!low || !ft.talk)) a.push('说话方式：' + p.talk);   // v0.1.33 古怪特质；低档不发涉性的几行
     if (!low) {
-      if (p.grade) a.push('片场性能：' + p.grade + (p.gradeText ? '（' + p.gradeText + '）' : ''));
+      if (p.grade) a.push('组里叫她「' + p.grade + '」：' + gradeLine(p, true));
       if (p.phys) a.push('体质：' + p.phys);
       if (p.react) a.push('床上：' + p.react);
       if (p.xp && p.xp.length) a.push('XP：' + p.xp.join('；'));
@@ -2009,7 +2011,7 @@ var PIANCHANG_CORE = (function () {
     parseScript: parseScript, parseScene: parseScene, mergeScene: mergeScene, scriptSane: scriptSane, pickMishapScene: pickMishapScene, parseRoles: parseRoles, scriptAllText: scriptAllText, makeIdea: makeIdea, ideaEmpty: ideaEmpty, ideaText: ideaText, ideaLineup: ideaLineup, draftLineup: draftLineup, draftPov: draftPov, floorDraft: floorDraft,ideaTier: ideaTier, applyIdea: applyIdea, ideaUnused: ideaUnused, markIdea: markIdea, lineCore: lineCore, cleanRaw: cleanRaw, sgFailKind: sgFailKind, failText: failText,
     markPlayer: markPlayer, castLine: castLine, shootPrompt: shootPrompt, softPose: softPose, softLines: softLines, doneLine: doneLine, statusPrompt: statusPrompt, parseStatus: parseStatus,
     PORTRAIT_N: PORTRAIT_N, PORTRAIT_BASE: PORTRAIT_BASE, portraitOk: portraitOk, portraitUrl: portraitUrl, pickPortrait: pickPortrait, fillPortraits: fillPortraits,
-    drawMan: drawMan, drawMen: drawMen, manLines: manLines, drawCand: drawCand, drawCands: drawCands, drawTraits: drawTraits, drawSpice: drawSpice, spicePool: spicePool, drawLook: drawLook, portraitFit: portraitFit, pickPortraitFor: pickPortraitFor, reqOfText: reqOfText, archOf: archOf, NC_LAYERS: NC_LAYERS, NC_KEYS: NC_KEYS, NC_LABEL: NC_LABEL, ncLines: ncLines, candLines: candLines, npcFaces: npcFaces, drawXP: drawXP, drawNG: drawNG, filmFee: filmFee, buildCandPrompt: buildCandPrompt, CAND_RETRY: CAND_RETRY, parseCands: parseCands, buildCandFromPrompt: buildCandFromPrompt, parseCandFrom: parseCandFrom, CAND_FROM_RETRY: CAND_FROM_RETRY, parseCandOne: parseCandOne, personLines: personLines,
+    drawMan: drawMan, drawMen: drawMen, manLines: manLines, gradeLine: gradeLine, drawCand: drawCand, drawCands: drawCands, drawTraits: drawTraits, drawSpice: drawSpice, spicePool: spicePool, drawLook: drawLook, portraitFit: portraitFit, pickPortraitFor: pickPortraitFor, reqOfText: reqOfText, archOf: archOf, NC_LAYERS: NC_LAYERS, NC_KEYS: NC_KEYS, NC_LABEL: NC_LABEL, ncLines: ncLines, candLines: candLines, npcFaces: npcFaces, drawXP: drawXP, drawNG: drawNG, filmFee: filmFee, buildCandPrompt: buildCandPrompt, CAND_RETRY: CAND_RETRY, parseCands: parseCands, buildCandFromPrompt: buildCandFromPrompt, parseCandFrom: parseCandFrom, CAND_FROM_RETRY: CAND_FROM_RETRY, parseCandOne: parseCandOne, personLines: personLines,
     buildTakePrompt: buildTakePrompt, parseTake: parseTake,
     finishChance: finishChance, rollFinish: rollFinish, bedCost: bedCost, REST: REST, pillGain: pillGain, pillRisk: pillRisk, gigPay: gigPay,
     filmScore: filmScore, monthCopies: monthCopies, marketBoard: marketBoard, actorBoard: actorBoard,
@@ -2555,7 +2557,7 @@ var PIANCHANG_PROFILE = (function () {
     var b = p.body || {}, g = p.gen || {}, img = portraitOf(p, opts, 'il');
     var pic = '<div class="pcp-pic">' + (img ? '<img src="' + esc(img) + '" alt="" loading="lazy" onerror="this.remove()">' : '') + '<b>' + esc((p.stageName || p.realName || '?').charAt(0)) + '</b></div>';
     var info = [
-      g.want ? row('人话', esc(g.want), 'long') : '', p.motive ? row('为什么来', esc(p.motive), 'long') : '', p.line ? row('一句话', esc(p.line), 'long') : '',
+      g.want ? row('心里话', esc(g.want), 'long') : '', p.motive ? row('为什么来', esc(p.motive), 'long') : '', p.line ? row('一句话', esc(p.line), 'long') : '',
       (p.stuck || g.stuck) ? row('卡在哪', esc(p.stuck || g.stuck), 'long') : '', p.past ? row('入行前', esc(p.past), 'long') : '', p.family ? row('家里', esc(p.family), 'long') : '',
     ].join('');
     var secret = examined(p) ? [
@@ -2595,7 +2597,7 @@ var PIANCHANG_PROFILE = (function () {
       after.length ? row('入行后', esc(after.slice(-8).join('、') + (after.length > 8 ? ' 等' : '')), 'long') : '',
       row('初体验', esc(firstText(p)), 'long'),
     ].join('');
-    var fgr = [p.grade ? row('片场性能', esc(p.grade) + (p.gradeText ? '<small>' + esc(p.gradeText) + '</small>' : ''), 'long') : '', p.phys ? row('体质', esc(p.phys), 'long') : '', p.sense ? row('身体', esc(p.sense), 'long') : '',
+    var fgr = [p.grade ? row('组里叫她', esc(p.grade) + '<small>' + esc((C && C.gradeLine ? C.gradeLine(p, true) : p.gradeText) || '') + '</small>', 'long') : '', p.phys ? row('体质', esc(p.phys), 'long') : '', p.sense ? row('身体', esc(p.sense), 'long') : '',
       b.sp ? row('特殊', esc(b.sp), 'long') : '', b.lac ? row('出奶', esc('没在哺乳期，一激动就有'), 'long') : '', p.react ? row('床上', esc(p.react), 'long') : ''].join('');   // v0.1.33 古怪特质
     return '<div class="pcp-cols">' + sec('身材', '<div class="pcp-list">' + fig + '</div>') + (fgr ? sec('体质', '<div class="pcp-list">' + fgr + '</div>', 'pcp-secret') : '') + sec('私处', '<div class="pcp-list">' + vul + '</div>', 'pcp-secret') +
       sec('后面', '<div class="pcp-list">' + back + '</div>') + sec('周期', '<div class="pcp-list">' + cyc + '</div>') + sec('经历', '<div class="pcp-list">' + exp + '</div>') + '</div>';
@@ -9780,8 +9782,8 @@ var PIANCHANG_ONLINE = (function () {
       (c.ddFrom ? '<div class="pc-line"><span class="tag gr" data-pc-dd="' + esc(c.ddFrom) + '">叮叮约来的</span></div>' : '');   // v0.1.28
     if (c.status === 'loading') return '<article class="pc-tal' + (UI.hlCand && UI.hlCand === c.id ? ' hl' : '') + '" data-pc-card="cand" data-id="' + esc(c.id) + '">' + h + '<div class="busy" style="margin-top:12px">她在门口填表……</div></div></article>';
     // 卡面只放最有戏的六层（一项一行）；其余几层进「请她进来聊聊」的人设。v0.1.5 以前的候选人没有抽签池那几层，照旧显示本事 / 卡在哪
-    h += profRows(c.pool >= 2 ? [['外形', c.look], ['入行前', c.past], ['为什么来', c.motive], ['人话', g.want || c.need], ['卡在哪', c.stuck], ['面试那天', c.entrance], ['性能', c.gradeText], ['体质', c.phys], ['床上', c.react], ['说话', c.talk]]
-      : [['外形', c.look], ['入行前', c.past], ['为什么来', c.motive], ['人话', g.want], ['本事', g.skill], ['卡在哪', g.stuck]]) + personTags(c) +
+    h += profRows(c.pool >= 2 ? [['外形', c.look], ['入行前', c.past], ['为什么来', c.motive], ['心里话', g.want || c.need], ['卡在哪', c.stuck], ['面试那天', c.entrance], ['组里说她', C.gradeLine(c, true)], ['体质', c.phys], ['床上', c.react], ['说话', c.talk]]
+      : [['外形', c.look], ['入行前', c.past], ['为什么来', c.motive], ['心里话', g.want], ['本事', g.skill], ['卡在哪', g.stuck]]) + personTags(c) +
       (g.intro ? '<div class="say">' + esc(g.intro) + '</div>' : '') + (g.answer ? '<div class="sub">问她为什么来：' + esc(g.answer) + '</div>' : '') + (c.sig ? '<div class="sub" data-pc-sig>招牌：「' + esc(c.sig) + '」</div>' : '');
     h += c.status === 'error'
       ? '<div class="err" style="margin-top:8px">' + esc(c.err || '没生成出来') + '</div><div class="pc-acts"><button class="btn sm" data-act="cand-retry" data-id="' + c.id + '">再试一次</button><button class="btn sm" data-act="cand-pass" data-id="' + c.id + '">不要了</button></div>'
@@ -9802,7 +9804,7 @@ var PIANCHANG_ONLINE = (function () {
   //   代码抽三个（core.drawMen），不花请求、不花钱；签下来进 s.dir.men，跟银星那四位一样按部请，开机选角、记账、喂正文都认
   function menCasting(st) {
     var ms = arr(st.dir.mcands);
-    return '<h3 class="h3" style="margin-top:22px">男优面试 · 一次三个</h3><div class="sub" style="margin-bottom:10px">男优也能招：性能、身体、床上什么样、NG 和 XP 都写在简历上。签下来起个艺名，跟银星那四位一样<b>按部请</b>（不花签约金），开机选角里就有他。</div>' +
+    return '<h3 class="h3" style="margin-top:22px">男优面试 · 一次三个</h3><div class="sub" style="margin-bottom:10px">男优也能招：组里怎么说他、身体、床上什么样、NG 和 XP 都写在简历上。签下来起个艺名，跟银星那四位一样<b>按部请</b>（不花签约金），开机选角里就有他。</div>' +
       '<div class="row" style="margin-bottom:12px"><button class="btn" data-act="mcast-start">' + (ms.length ? '再面三个男优' : '面三个男优') + '</button></div>' +
       (ms.length ? '<div class="pc-tgrid" data-pc-mcands>' + ms.map(mcandCard).join('') + '</div>' : '');
   }
@@ -9812,7 +9814,7 @@ var PIANCHANG_ONLINE = (function () {
     return '<article class="pc-tal" data-pc-card="mcand" data-id="' + esc(m.id) + '">' + photoTop(m, m.surname, 'No.' + String((i || 0) + 1).padStart(2, '0')) + '<div class="pc-tb">' +
       '<h3 class="pc-name"><span class="rb">ACTOR · 本名</span>' + esc(m.realName) + '<small>' + m.age + ' 岁 · ' + esc(m.hometown || '') + '</small></h3>' +
       '<div class="pc-line"><span class="tag' + (top ? '' : ' gr') + '" data-pc-grade="' + esc(m.gradeKey) + '">' + esc(m.grade) + ' · ' + esc(m.gradeKey) + '</span><span>一部 ' + esc(money(m.fee)) + (m.odd ? ' · 业内都市传说' : '') + '</span></div>' +
-      profRows([['性能', m.gradeText], ['本事', m.ability], ['身体', manBody(m.body)], ['身上', m.mark], ['床上', m.bed], ['说话', m.talk], ['小动作', m.quirk], ['入行前', m.past], ['为什么来', m.motive], ['卡在哪', m.stuck], ['家里', m.family]]) + personTags(m) +
+      profRows([['组里说他', C.gradeLine(m, false)], ['本事', m.ability], ['身体', manBody(m.body)], ['身上', m.mark], ['床上', m.bed], ['说话', m.talk], ['小动作', m.quirk], ['入行前', m.past], ['为什么来', m.motive], ['卡在哪', m.stuck], ['家里', m.family]]) + personTags(m) +
       (m.sig ? '<div class="say">' + esc(m.sig) + '</div>' : '') +
       '<div class="pc-acts"><button class="btn sm pri" data-act="mcand-sign" data-id="' + esc(m.id) + '">签下 · 起艺名</button><button class="btn sm" data-act="mcand-pass" data-id="' + esc(m.id) + '">不要</button></div></div></article>';
   }
