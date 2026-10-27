@@ -687,6 +687,22 @@ var PIANCHANG_CORE = (function () {
   }
   // v0.1.29：草稿是不是第一视角片。只认「第一视角 / 第一人称 / POV / 视角：主观」；「主观镜头」是普通片里的一种机位，不算
   function draftPov(t) { return /第一视角|第一人称|POV|视角\s*[：:]\s*主观/i.test(String(t || '')); }
+  // v0.1.30（亚伦：在正文里跟 AI 聊剧本有活人感）：「自己写」的「从正文拿」，把一楼 AI 正文洗成草稿。照 skill 06 副轨第 8 条 + 小狸 Live 的 stripProse：
+  //   整块删：注释（<!--叮叮-->）、style / script、思维容器、我们自己写进楼里的 📄 剧本块 / 叮叮折叠块 / ```chat 誊本、[TIME]
+  //   只脱壳留内容：别的 ``` 围栏（企划案常被模型包在代码块里）、其余标签（<content> 里装的就是正文；不跨行，免得吞掉两个尖括号之间的字）
+  //   不砍状态栏字段行：企划里的「角色：」「场景：」跟状态栏长一个样，多出来的玩家在框里自己删
+  //   洗完一个字不剩（整楼包在思维容器里的预设）就退回温和洗：思维容器只脱壳
+  var FLOOR_THINK = 'think|thinking|thought|reasoning|cot|analysis|scratchpad';
+  function floorDraft(raw) {
+    var base = String(raw == null ? '' : raw).replace(/\r/g, '')
+      .replace(/<style[\s\S]*?<\/style>/gi, '').replace(/<script[\s\S]*?<\/script>/gi, '').replace(/<!--[\s\S]*?-->/g, '')
+      .replace(/<details data-pc(?:script|ddlog)[\s\S]*?<\/details>/g, '').replace(/```chat\n[\s\S]*?\n```/g, '')
+      .replace(/\[TIME\s*[:：][^\]\n]*\]/gi, '');
+    function tidy(t) { return t.replace(/```[a-z]*\n?/gi, '').replace(/<[^>\n]{1,300}>/g, '').replace(/[ \t]+$/gm, '').replace(/\n{3,}/g, '\n\n').trim(); }
+    var strict = base.replace(new RegExp('<(' + FLOOR_THINK + ')(?:\\s[^>]*)?>[\\s\\S]*?<\\/\\1\\s*>', 'gi'), '');
+    var lone = strict.match(new RegExp('<\\/(?:' + FLOOR_THINK + ')\\s*>', 'i')); if (lone) strict = strict.slice(lone.index + lone[0].length);   // 开头那半截在预填里
+    return tidy(strict) || tidy(base);
+  }
   // v0.1.29（亚伦：草稿里写了离异少妇、逃犯、巡警，出来的剧本成了隔壁人妻、外卖员）：交给编剧补全时草稿就是这一部的故事，
   //   故事那几格（企划、事件、场景、她是、他是、关系、开场、服装、收尾、限制、特摄、随机视角）整个不抽；只留玩法、姿势、特征、规矩这类，给编剧挑着补
   var DRAFT_DROP = /^(?:企划|作品|环节|环节二|事件|场景|换场|她是|他是|关系|开场|服装|收尾|限制|视角)(?:·|$)/;
@@ -1695,7 +1711,7 @@ var PIANCHANG_CORE = (function () {
     poseFamily: poseFamily, POSE_CAM: POSE_CAM, poseCamLines: poseCamLines, scenePoses: scenePoses, drawPoses: drawPoses, tagNames: tagNames, fixTags: fixTags, isPovSc: isPovSc, POV: POV, povOf: povOf, tagFix: tagFix, headForShoot: headForShoot, ncKey: ncKey, NC_RECENT: NC_RECENT,
     STYLE_JA: STYLE_JA, STYLE_JA_POV: STYLE_JA_POV, MULTI_RULES: MULTI_RULES, scFilterOk: scFilterOk, scFilterOn: scFilterOn, scFilterBar: scFilterBar, scFilterClick: scFilterClick,
     buildStep1: buildStep1, buildStep2: buildStep2, STEP1_RETRY: STEP1_RETRY, STEP2_RETRY: STEP2_RETRY,
-    parseScript: parseScript, parseScene: parseScene, mergeScene: mergeScene, scriptSane: scriptSane, pickMishapScene: pickMishapScene, parseRoles: parseRoles, scriptAllText: scriptAllText, makeIdea: makeIdea, ideaEmpty: ideaEmpty, ideaText: ideaText, ideaLineup: ideaLineup, draftLineup: draftLineup, draftPov: draftPov, ideaTier: ideaTier, applyIdea: applyIdea, ideaUnused: ideaUnused, markIdea: markIdea, lineCore: lineCore, cleanRaw: cleanRaw, sgFailKind: sgFailKind, failText: failText,
+    parseScript: parseScript, parseScene: parseScene, mergeScene: mergeScene, scriptSane: scriptSane, pickMishapScene: pickMishapScene, parseRoles: parseRoles, scriptAllText: scriptAllText, makeIdea: makeIdea, ideaEmpty: ideaEmpty, ideaText: ideaText, ideaLineup: ideaLineup, draftLineup: draftLineup, draftPov: draftPov, floorDraft: floorDraft,ideaTier: ideaTier, applyIdea: applyIdea, ideaUnused: ideaUnused, markIdea: markIdea, lineCore: lineCore, cleanRaw: cleanRaw, sgFailKind: sgFailKind, failText: failText,
     markPlayer: markPlayer, castLine: castLine, shootPrompt: shootPrompt, softPose: softPose, softLines: softLines, doneLine: doneLine, statusPrompt: statusPrompt, parseStatus: parseStatus,
     PORTRAIT_N: PORTRAIT_N, PORTRAIT_BASE: PORTRAIT_BASE, portraitOk: portraitOk, portraitUrl: portraitUrl, pickPortrait: pickPortrait, fillPortraits: fillPortraits,
     drawCand: drawCand, drawCands: drawCands, drawTraits: drawTraits, drawSpice: drawSpice, spicePool: spicePool, drawLook: drawLook, portraitFit: portraitFit, pickPortraitFor: pickPortraitFor, reqOfText: reqOfText, archOf: archOf, NC_LAYERS: NC_LAYERS, NC_KEYS: NC_KEYS, NC_LABEL: NC_LABEL, ncLines: ncLines, candLines: candLines, npcFaces: npcFaces, drawXP: drawXP, drawNG: drawNG, filmFee: filmFee, buildCandPrompt: buildCandPrompt, CAND_RETRY: CAND_RETRY, parseCands: parseCands, buildCandFromPrompt: buildCandFromPrompt, parseCandFrom: parseCandFrom, CAND_FROM_RETRY: CAND_FROM_RETRY, parseCandOne: parseCandOne, personLines: personLines,
@@ -3247,16 +3263,23 @@ var PIANCHANG_DD = (function () {
   function voiceSecs(t) { return Math.max(1, Math.min(60, Math.round(String(t || '').replace(/\s/g, '').length / 3.5))); }
   // 玩家预设会命令模型在一切输出末尾追加状态栏字段，副轨也逃不掉：认出第一条字段行，从它开始整段砍掉（模板原样）
   var JUNK_LINE = /^\s*[\[\(（【<]?\s*(npc|affection|time|location|atmosphere|characters?|costume|clothes|outfit|event|agenda|item|items|summary|date|mood|weather|scene|status|state|thought|thoughts|relationship|favor|人物|角色|事件|地点|时间|氛围|气氛|服装|着装|穿着|状态|心情|情绪|天气|场景|物品|日程|好感|好感度|关系|备注|总结)\s*[\]\)）】>]?\s*[:：=]/i;
+  // v0.1.30（crazyman2333：文尾插入数值变量）：MVU 的 <UpdateVariable> 以前不在整块删的单子里（单子上写的是 update_variable），里面的 _.set(...) 会变成叮叮气泡
+  var VAR_BLOCK = /<(update_?variable|initvar|status_?block|status)(?:\s[^>]*)?>[\s\S]*?<\/\1\s*>/gi;
+  // 状态栏顶头：前面只有空行、分隔线、【状态栏】这种小标题
+  var HEAD_ONLY = /^\s*(?:[-=*_~—─━·•]{3,}|[【\[［<（(][^】\]］>）)]{0,12}[】\]］>）)])?\s*$/;
   function cleanAI(s) {
     var txt = String(s || '')
       .replace(/```[\s\S]*?```/g, '')
-      .replace(/<(think|thinking|reasoning|update_variable|initvar|Analysis|horae\w*)>[\s\S]*?<\/\1>/gi, '')
+      .replace(VAR_BLOCK, '')
+      .replace(/<(think|thinking|reasoning|Analysis|horae\w*)>[\s\S]*?<\/\1>/gi, '')
       .replace(/<(?!\/?bqb>)[^>]*>/g, '');
     var lone = txt.match(/<\/(think|thinking|reasoning)\s*>/i); if (lone) txt = txt.slice(lone.index + lone[0].length);
     var lines = txt.split('\n'), cut = -1;
     for (var i = 0; i < lines.length; i++) { if (JUNK_LINE.test(lines[i])) { cut = i; break; } }
+    // v0.1.30：状态栏写在最前面（前面只有标题、分隔线）时以前从它起整段砍，回复就空了；这种只挑掉字段行
+    if (cut > 0 && lines.slice(0, cut).every(function (l) { return HEAD_ONLY.test(l); })) { lines = lines.slice(cut); cut = 0; }   // 标题一起丢
     if (cut > 0) lines = lines.slice(0, cut);
-    else if (cut === 0) lines = lines.filter(function (l) { return !JUNK_LINE.test(l); });
+    else if (cut === 0) lines = lines.filter(function (l) { return !JUNK_LINE.test(l) && !/^\s*[-=*_~—─━·•]{3,}\s*$/.test(l); });
     return lines.join('\n').trim();
   }
   function escRe(s) { return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
@@ -3601,7 +3624,7 @@ var PIANCHANG_DD = (function () {
   //   洗空兜底（skill 06 副轨第 8 条）：严格洗完一个字不剩，才退回温和洗（围栏 / 思维容器只脱壳留内容）；我们自己的 ```chat 誊本两种洗法都剥掉（聊天记录另外整段喂）
   function storyOf(t) { try { return C.storyOnly ? C.storyOnly(t) : t; } catch (e) { return t; } }
   function washFloor(raw) {
-    var base = storyOf(String(raw || '').replace(DDLOG_RE, '').replace(FENCE_RE, '\n').replace(PHONE_CMT_RE, '\n'));
+    var base = storyOf(String(raw || '').replace(DDLOG_RE, '').replace(FENCE_RE, '\n').replace(PHONE_CMT_RE, '\n').replace(VAR_BLOCK, '\n'));   // v0.1.30：变量块不当正文喂给叮叮
     var strict = base.replace(/<(think|thinking|reasoning)>[\s\S]*?<\/\1>/gi, '').replace(/```[\s\S]*?```/g, '').replace(/<[^>]+>/g, '').replace(/\n{2,}/g, '\n').trim();
     if (strict) return strict;
     return base.replace(/```[a-z]*\n?/gi, '').replace(/<\/?(think|thinking|reasoning)>/gi, '').replace(/<[^>]+>/g, '').replace(/\n{2,}/g, '\n').trim();
@@ -3679,15 +3702,24 @@ var PIANCHANG_DD = (function () {
       '<!--' + APP + '\n名字：消息\n-->\n' +
       '一行一条，最多三条，名字用正文里写过的全名、一字不差，消息像真人打字一样短；' + U + '自己发的不写；没有就整段不写。' +
       '这一轮正文里有人刚和' + U + '当面加了' + APP + '（扫码、交换号码），这一段一定要写，让这个人发一句打招呼：' + U + '的' + APP + '通讯录只认这一段，不写就加不上。' +
-      '拉黑过' + U + '的人在正文里明确和好了，可以写「名字：(解除拉黑)」。';
+      '拉黑过' + U + '的人在正文里明确和好了，可以写「名字：(解除拉黑)」。' + VAR_NOTE;
   }
+  // v0.1.30（crazyman2333「叮叮好友对我不起作用」）：「正文里的人主动来消息」关了，以前连当面加叮叮这条一起不带——正文里加了好友永远加不上，设置里也没写。
+  //   现在关了只不带「主动来消息」，当面加好友这条照带
+  function phoneAddRule(s) {
+    var U = uc(s);
+    return '【' + APP + '】这一轮正文里有人刚和' + U + '当面加了' + APP + '（扫码、交换号码），就在这条回复的最后另起几行写：\n' +
+      '<!--' + APP + '\n名字：打招呼的一句\n-->\n' +
+      '名字用正文里写过的全名、一字不差；' + U + '的' + APP + '通讯录只认这一段，不写就加不上。没人加就整段不写。' + VAR_NOTE;
+  }
+  var VAR_NOTE = '预设要你在文末写状态栏、变量的照写，这一段另外写，不算在它们里面。';
   function lastTs(h) { var m = (h || [])[(h || []).length - 1]; return (m && m.ts) || 0; }
   function refreshInjection() {
     try { uninjectPrompts([INJ_ID]); } catch (e) {}
     if (!C) return;
     var c = cfg(), s = st(), parts = [];
     if (c.inject !== false) { var t = injText(s); if (t) parts.push(t); }
-    if (c.auto !== false && hasIdentity(s)) parts.push(phoneRule(s));
+    if (hasIdentity(s)) parts.push(c.auto !== false ? phoneRule(s) : phoneAddRule(s));
     if (!parts.length) return;
     try { injectPrompts([{ id: INJ_ID, position: 'in_chat', depth: 1, role: 'system', content: uify(parts.join('\n\n'), s), should_scan: true }]); } catch (e) {}
   }
@@ -4980,7 +5012,7 @@ var PIANCHANG_DD = (function () {
     while ((mm = re.exec(txt))) blocks.push(mm[1] || '');
     var s = st(), U = uc(s), userRe = userLineRe(s), t = stamp(s), land = {}, order = [], n = 0, story = blocks.length ? await seenText(s) : '';   // v0.1.27：整楼 40 楼 + 叮叮记录（以前 8 楼 × 前 2000 字）
     for (var b = 0; b < blocks.length; b++) {
-      var lines = String(blocks[b]).split('\n');
+      var lines = String(blocks[b]).replace(/^[\s:：|｜]+/, '').split('\n');   // v0.1.30：写成一行的 <!--叮叮：名字：消息--> 以前开头多个冒号，整条对不上人
       for (var i = 0; i < lines.length && n < 3; i++) {
         var line = lines[i].replace(/^\s*[-•·]\s*/, '').trim(); if (!line || userRe.test(line)) continue;
         var k = line.search(/[:：|｜]/); if (k <= 0 || k > 12) continue;
@@ -5272,7 +5304,7 @@ var PIANCHANG_DD = (function () {
     busy: function () { return !!(generating || _call); },   // v0.1.28：玩家发的消息正在等回 / 正在通话（主脚本的楼层存档点算「动过」）
     notifyEvent: notifyEvent, onMainReceived: onMainReceived, os: { contacts: osContacts, contact: osContact, current: osCurrent, openByName: openByName }, gen: gen, apiCfg: customApi, ttsOn: ttsOn, speak: speak, stopVoice: stopVoice, renderFloorBubbles: renderFloorBubbles, floorTheme: floorTheme, APP: APP,
     _t: { splitBatch: splitBatch, batchPrompt: batchPrompt, parsePrivate: parsePrivate, parseGroup: parseGroup, parseNpcLine: parseNpcLine, parseCallText: parseCallText, inviteChatId: inviteChatId, resolveSticker: resolveSticker, privatePrompt: privatePrompt, groupPrompt: groupPrompt, groups: groups, findChat: findChat, view: function () { return view; },
-      fenceRows: fenceRows, splitTail: splitTail, parseBubs: parseBubs, floorScan: floorScan, maybeAmbient: maybeAmbient, washFloor: washFloor, ttsSegs: ttsSegs, fishOf: fishOf, cfg: cfg, saveCfg: saveCfg, phoneRule: phoneRule, AMB: AMB, onPromptReady: onPromptReady, flushN: function () { return _flushN; }, genCount: function () { return _genCount; } },
+      fenceRows: fenceRows, splitTail: splitTail, parseBubs: parseBubs, floorScan: floorScan, maybeAmbient: maybeAmbient, washFloor: washFloor, ttsSegs: ttsSegs, fishOf: fishOf, cfg: cfg, saveCfg: saveCfg, phoneRule: phoneRule, phoneAddRule: phoneAddRule, cleanAI: cleanAI, refreshInjection: refreshInjection, AMB: AMB, onPromptReady: onPromptReady, flushN: function () { return _flushN; }, genCount: function () { return _genCount; } },
   };
 })();
 
@@ -7147,7 +7179,8 @@ var PIANCHANG_ONLINE = (function () {
 
   // 【片场近况】每轮挂，深度 1，system；玩家看不见。剧情时间照纸醉金迷的 [TIME]：脚本读完就从楼层里擦掉
   function timeAsk(st) {
-    return '这条回复写完，最后单独一行写剧情时间 [TIME:HH:MM|M/D]：这条回复结尾那一刻的时间。片场日历上今天是第 ' + st.day + ' 天 = ' + C.mdShort(st.day) + '，现在是 ' + C.mdShort(st.day) + ' ' + st.clock + '；日期从这天往后接，同一天里的事都写 ' + C.mdShort(st.day) + '，故事过了夜才写第二天的日期。';
+    return '这条回复写完，最后单独一行写剧情时间 [TIME:HH:MM|M/D]：这条回复结尾那一刻的时间。片场日历上今天是第 ' + st.day + ' 天 = ' + C.mdShort(st.day) + '，现在是 ' + C.mdShort(st.day) + ' ' + st.clock + '；日期从这天往后接，同一天里的事都写 ' + C.mdShort(st.day) + '，故事过了夜才写第二天的日期。' +
+      '预设要你在文末写状态栏、变量的照写，这一行另外写，不算在它们里面，格式一字不改。';   // v0.1.30（crazyman2333：文尾插入数值变量，[TIME] 被挤掉）
   }
   var NEWS_GOT = {}, NEWS_GONE = {};
   function recentLine(st, news) {
@@ -9541,6 +9574,25 @@ var PIANCHANG_ONLINE = (function () {
     UI.modal = null; UI.gen.draft = ''; render();
     writeScript(faceKey(st), sl);
   }
+  // v0.1.30（亚伦：在正文里跟 AI 聊剧本有活人感）：「从正文拿」把最近一楼 AI 正文洗干净放进框里，省得手动复制。
+  //   框里有自己写的字就接在后面；刚拿进来的没动过、再点一下就换成往前一楼（AI 总结完又聊了两句的时候）。第 0 楼开场白不拿
+  function customPull() {
+    var m = UI.modal, ta = PANEL.querySelector('#pc-custom'); if (!m || m.kind !== 'custom') return;
+    var cur = ta ? ta.value : String(m.text || ''), again = !!(m.pull && cur === m.pull.text);
+    var pre = again ? m.pull.pre : cur.replace(/\s+$/, ''), from = again ? m.pull.at - 1 : lastId(), hit = null;
+    try {
+      if (from >= 1) {
+        var ms = getChatMessages(Math.max(1, from - 40) + '-' + from) || [];
+        for (var i = ms.length - 1; i >= 0 && !hit; i--) { var t = ms[i] && ms[i].role === 'assistant' && C.floorDraft(ms[i].message); if (t) hit = { at: Number(ms[i].message_id), t: t }; }
+      }
+    } catch (e) {}
+    if (!hit) { m.err = again ? '再往前没有 AI 写的正文了。' : '正文里还没有 AI 写的楼。'; render(); return; }
+    var text = pre ? pre + '\n\n' + hit.t : hit.t;
+    m.text = text; m.err = ''; m.pull = { at: hit.at, pre: pre, text: text };
+    if (ta) ta.value = text;   // render 前会从框里读回 m.text，先把框填上
+    render();
+    toast('info', '拿了第 ' + hit.at + ' 楼' + (pre ? '，接在你写的后面' : '') + '。不是这楼就再点一下，往前换一楼');
+  }
   function genBox() {
     if (GEN.busy) return '<div class="card hl"><div class="busy">✍ 在写剧本：' + esc(GEN.step) + '</div><div class="faint">两步写：先片头和分场表，再一场一场写台词，每一步都很短，不会被截断。可以关掉面板等。</div></div>';
     return GEN.err ? '<div class="card warn"><div class="err">' + esc(GEN.err) + '</div></div>' : '';
@@ -9880,7 +9932,7 @@ var PIANCHANG_ONLINE = (function () {
         (sl ? '<div class="lbl">抽到的（' + esc(sl.lineup) + ' · ' + esc(sl.length || '') + (sl.pov ? ' · 第一视角' : '') + (sl.toku ? ' · 特摄片' : '') + ' · ' + sl.n + ' 场）</div><div class="script short">' + esc(C.slotBraces(sl).replace(/\}\{/g, '}\n{')) + '</div>' : '') +
         '<div class="act"><button class="btn" data-act="modal-x">算了</button><button class="btn" data-act="gen-draw">' + (sl ? '重抽' : '抽格子') + '</button><button class="btn pri" data-act="gen-go"' + (sl ? '' : ' disabled') + '>写</button></div>';
     }
-    else if (m.kind === 'custom') body = genTabs('mine') + '<div class="eb">MY SCRIPT</div><h2 class="h">✍ 自己写剧本</h2><div class="sub">格式不全也没关系：写多少算多少，点「交给编剧补全」，编剧照你的意思把缺的补上、润色，你写的台词原样留着。格式全了就直接「存」。完整格式照剧本库：片头几行（企划：《片名》、档位、分类、视角、长度、卖点、角色……），一行 ---，然后每场「#1 场名｜地点」+ 在场 / 玩法 / 姿势 / 要，台词可有可无（没台词的场开拍时照「要」现场演）。老格式（情 / 新）也认。</div><textarea id="pc-custom" style="min-height:260px;margin-top:10px" placeholder="企划：《片名》&#10;档位：R18常见XP｜约90分钟·5场&#10;卖点：……&#10;角色：她＝名字（年龄，身份）；他＝名字（男优位·主，身份）&#10;---&#10;#1 场名｜地点&#10;在场：她、他&#10;情：……&#10;新：起&#10;要：……">' + esc(m.text || '') + '</textarea>' + (m.err ? '<div class="err">' + esc(m.err) + '</div>' : '') + '<div class="act"><button class="btn" data-act="modal-x">算了</button><button class="btn" data-act="custom-save">存</button><button class="btn pri" data-act="custom-ai"' + (GEN.busy ? ' disabled' : '') + '>交给编剧补全</button></div>';
+    else if (m.kind === 'custom') body = genTabs('mine') + '<div class="eb">MY SCRIPT</div><h2 class="h">✍ 自己写剧本</h2><div class="sub">格式不全也没关系：写多少算多少，点「交给编剧补全」，编剧照你的意思把缺的补上、润色，你写的台词原样留着。格式全了就直接「存」。完整格式照剧本库：片头几行（企划：《片名》、档位、分类、视角、长度、卖点、角色……），一行 ---，然后每场「#1 场名｜地点」+ 在场 / 玩法 / 姿势 / 要，台词可有可无（没台词的场开拍时照「要」现场演）。老格式（情 / 新）也认。</div><div class="row" style="margin-top:10px;align-items:center"><button class="btn sm" data-act="custom-pull">📋 从正文拿</button><span class="faint">在正文里跟 AI 聊出来的企划，点一下就进框里；不是那一楼就再点，往前换一楼</span></div><textarea id="pc-custom" style="min-height:260px;margin-top:10px" placeholder="企划：《片名》&#10;档位：R18常见XP｜约90分钟·5场&#10;卖点：……&#10;角色：她＝名字（年龄，身份）；他＝名字（男优位·主，身份）&#10;---&#10;#1 场名｜地点&#10;在场：她、他&#10;情：……&#10;新：起&#10;要：……">' + esc(m.text || '') + '</textarea>' + (m.err ? '<div class="err">' + esc(m.err) + '</div>' : '') + '<div class="act"><button class="btn" data-act="modal-x">算了</button><button class="btn" data-act="custom-save">存</button><button class="btn pri" data-act="custom-ai"' + (GEN.busy ? ' disabled' : '') + '>交给编剧补全</button></div>';
     else if (m.kind === 'finish') {
       var isDir = dirLike(identity(st)), A = isDir ? dirBody(st) : st.act, p = Math.round(C.finishChance(A, false) * 100), sh9 = curShoot(st);
       body = '<div class="eb">FINISH</div><h2 class="h">收尾 · #' + m.n + '</h2><div class="sub">' + (isDir ? (sh9 && !sh9.pov ? '你自己上，柯大河掌机。' : '你自己上，一手拿着机器。') + '状态 ' + (A.stamina | 0) + '，这一条大概 ' + p + '% 收得住。没收住可以再来一条，或者用特写糊弄（片子评分扣一点，抽查更容易被挑出毛病）。' : '男优不完事，全组拿不到钱。状态 ' + (A.stamina | 0) + '，这一条大概 ' + p + '% 收得住。药：状态补一截，这周第 ' + ((A.dose || 0) + 1) + ' 片，越吃越不管用，吃多了身体会出事。') + '</div>';
@@ -10199,6 +10251,7 @@ var PIANCHANG_ONLINE = (function () {
       case 'idea-len': grabIdea(); UI.modal.ilen = t.getAttribute('data-t'); render(); break;
       case 'idea-go': ideaGo(st); break;
       case 'custom-ai': customAi(st); break;
+      case 'custom-pull': customPull(); break;
       case 'gen-toku': grabIdea(); UI.gen.toku = !!t.getAttribute('data-t'); if (UI.modal) UI.modal.slots = null; render(); break;
       case 'gen-draw': grabToku(); UI.modal.slots = C.drawSlots(UI.gen.tier, { identity: identity(st), toku: !!UI.gen.toku, work: UI.gen.work }); render(); break;
       case 'gen-go': { grabToku(); var sl = UI.modal && UI.modal.slots; UI.modal = null; if (sl && sl.toku && UI.gen.toku) C.setTokuWork(sl, UI.gen.work); if (sl) writeScript(faceKey(st), sl); break; }
@@ -10582,10 +10635,21 @@ var PIANCHANG_ONLINE = (function () {
   // ═════════════════════════ 正文 ↔ 脚本 ═════════════════════════
   // [TIME:HH:MM|M/D]：读完从楼层里擦掉；日期往后跳了就过日子。一次跳超过 7 天当模型写错了（现实日期、编的日期），整条不认
   //   （v0.1.17 照纸醉金迷：原来是「最多按 7 天算」，模型写一个现实日期 10/24，片场就白过一周）
-  var TIME_RE = /\n?\s*\[TIME\s*[:：]\s*(\d{1,2})\s*[:：]\s*(\d{2})\s*(?:[|｜]\s*(?:(\d{4})\s*[-\/年.]\s*)?(\d{1,2})\s*[-\/月.]\s*(\d{1,2})\s*日?)?\s*\]\s*/i;
+  // v0.1.30（crazyman2333：日历一直不走）：也认模型顺手写歪的——日期后面带星期「6/2 周二」（【片场近况】里就是这么写的）、多一格「|片场」、
+  //   带秒、逗号或空格隔开、全角括号 / 斜杠。以前差一个字整条不认，还留在楼里
+  var TIME_RE = /\n?\s*[\[［【]\s*TIME\s*[:：]\s*(\d{1,2})\s*[:：]\s*(\d{2})(?:\s*[:：]\s*\d{2})?\s*(?:[|｜,，\s]\s*(?:(\d{4})\s*[-\/／年.]\s*)?(\d{1,2})\s*[-\/／月.]\s*(\d{1,2})\s*日?)?[^\]］】\n]{0,16}[\]］】]\s*/i;
   // 重抽 / 重新生成 / 续写：上一版回复已经推过日子了，这次只对时钟，不再往后推（不然一次重抽多过一天）
   var TIME_NO_ADV = { swipe: 1, regenerate: 1, 'continue': 1 };
   var TIME_RE_ALL = new RegExp(TIME_RE.source, 'gi');
+  // v0.1.30（crazyman2333「日历对我不起作用，是不是文尾插入数值变量的原因」）：正文连着 3 楼没写 [TIME]，日历就一直不走，以前一声不吭。
+  //   提醒一次（刷新前不再说）：多半是预设文末的状态栏 / 变量块把这一行挤掉了
+  var TIME_MISS = 0, TIME_MISS_TOLD = false;
+  function timeMiss(type) {
+    if (type === 'continue' || TIME_MISS_TOLD || !identity(readState())) return;
+    if (++TIME_MISS < 3) return;
+    TIME_MISS_TOLD = true;
+    toast('warning', '正文连着 3 楼没写时间标签 [TIME]，片场日历没跟着走。多半是预设文末的状态栏、变量块把它挤掉了；日子可以先在面板里点「结束今天」过');
+  }
   function onTimeTag(mesId, type) {
     if (type === 'first_message' || type === 'impersonate' || type === 'quiet') return Promise.resolve();
     _memoQ = _memoQ.then(doTime, doTime);   // 跟叮叮誊正文排同一条队：两边都改最新一楼
@@ -10593,16 +10657,17 @@ var PIANCHANG_ONLINE = (function () {
     async function doTime() {
     try {
       var ms = getChatMessages(mesId); var m = ms && ms[0]; if (!m || m.role !== 'assistant') return;
-      var txt = String(m.message || ''), all = txt.match(TIME_RE_ALL); if (!all) return;
+      var txt = String(m.message || ''), all = txt.match(TIME_RE_ALL);
+      if (!all) { timeMiss(type); return; }
+      TIME_MISS = 0;
       var mm = all[all.length - 1].match(TIME_RE);   // 有好几个就认最后一个
       var hh = Math.min(23, Number(mm[1])), mi = mm[2], st = readState(), adv = 0, wild = 0;
+      var c0 = String(st.clock || '').split(':'), t0 = Number(c0[0]) * 60 + Number(c0[1]), wrap = t0 >= 0 && hh * 60 + Number(mi) < t0 - 240 ? 1 : 0;   // 钟往回拨了四个钟头以上＝过了夜
       if (mm[4] && !TIME_NO_ADV[type]) {
         var d = mm[3] ? C.dayOfDate(new Date(Number(mm[3]), Number(mm[4]) - 1, Number(mm[5]))) : C.dayFromMD(Number(mm[4]), Number(mm[5]), st.day);
-        if (d - st.day > 7) wild = d - st.day; else adv = Math.max(0, d - st.day);
-      } else if (!mm[4] && !TIME_NO_ADV[type]) {
-        var c0 = String(st.clock || '').split(':'), t0 = Number(c0[0]) * 60 + Number(c0[1]);
-        if (t0 >= 0 && hh * 60 + Number(mi) < t0 - 240) adv = 1;
-      }
+        // v0.1.30：日期比面板还早（模型抄了预设状态栏里自己那套日期）以前永远不跳；现在退回看钟有没有过夜
+        if (d - st.day > 7) wild = d - st.day; else if (d < st.day) adv = wrap; else adv = d - st.day;
+      } else if (!mm[4] && !TIME_NO_ADV[type]) adv = wrap;
       var clean = txt.replace(TIME_RE_ALL, '\n').replace(/\n{3,}$/, '\n').trimEnd();
       try { await setChatMessages([{ message_id: m.message_id, message: clean }], { refresh: 'affected' }); } catch (e) {}
       // v0.1.26（crazyman2333：正文写「过了两个星期」不跳）：超过 7 天不再整条不认，打开面板问一句，玩家点「好」才跳；AI 写错的现实日期点「算了」
@@ -10864,7 +10929,7 @@ var PIANCHANG_ONLINE = (function () {
   // 面板 / 叮叮里动了存档的点击记一笔时间（捕获阶段，先于各自的处理）。纯翻页、开关弹层、设置、联机市场（联机的不撤）、换图不算
   var RB_NAV = { close: 1, 'theme-open': 1, 'theme-close': 1, 'theme-set': 1, settings: 1, 'set-save': 1, 'key-clear': 1, 'llm-test': 1, 'llm-models': 1, 'tips-again': 1, 'tips-ok': 1, 'modal-x': 1, 'modal-bg': 1,
     ledger: 1, 'cal-prev': 1, 'cal-next': 1, endday: 1, skip: 1, 'to-co': 1, 'co-rename': 1, 'co-rename-x': 1, 'cast-script': 1, 'cs-call': 1, 'tk-mode': 1, 'tk-who': 1, 'tk-n': 1, 'mk-pov': 1, scf: 1,
-    profile: 1, 'to-take': 1, 'gen-open': 1, 'idea-open': 1, 'gen-mode': 1, 'gen-tier': 1, 'idea-pov': 1, 'idea-len': 1, 'gen-toku': 1, 'gen-draw': 1, 'custom-open': 1, 'sc-view': 1, 'sc-edit': 1, 'sc-take': 1, 'sc-shoot': 1,
+    profile: 1, 'to-take': 1, 'gen-open': 1, 'idea-open': 1, 'gen-mode': 1, 'gen-tier': 1, 'idea-pov': 1, 'idea-len': 1, 'gen-toku': 1, 'gen-draw': 1, 'custom-open': 1, 'custom-pull': 1, 'sc-view': 1, 'sc-edit': 1, 'sc-take': 1, 'sc-shoot': 1,
     'cand-sign': 1, 'sh-drop-ask': 1, 'wb-retry': 1, 'sc-post': 1, 'rb-ok': 1, 'rb-keep': 1 };
   var RB_DDX = { flush: 1, send: 1, stk: 1, 'tf-go': 1, 'vc-go': 1, reroll: 1, recall: 1, claim: 1, inv: 1, call: 1, 'c-popok': 1, 'c-roll': 1, 'c-hang': 1, 'set-clear': 1 };
   function touchAct(e) {
