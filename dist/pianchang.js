@@ -660,9 +660,11 @@ var PIANCHANG_CORE = (function () {
   function ideaLines(t) { return String(t || '').split(/\r?\n/).map(function (x) { return x.replace(/^\s*(?:[-*•]|\d+[.、)）])\s*/, '').trim(); }).filter(Boolean); }
   // 草稿里的台词行：「名字：「……」」这种，✍ 标记和「要原样用上」都看这几句
   function draftLines(t) { return String(t || '').split(/\r?\n/).map(function (l) { return l.trim(); }).filter(function (l) { return /^[^#：:]{1,8}[：:]\s*[「“"]/.test(l); }).slice(0, 20); }
+  // v0.1.29：草稿上限 4000 → 12000（亚伦：正文里让 AI 总结的企划案很长，角色那段排在后面会被截掉）
+  var DRAFT_MAX = 12000;
   function makeIdea(o) {
     o = o || {};
-    var idea = { title: clip(String(o.title || '').replace(/[《》]/g, ''), 60), pitch: clip(o.pitch || '', 120), scenes: ideaLines(o.scenes).slice(0, 8).map(function (x) { return clip(x, 120); }), lines: ideaLines(o.lines).slice(0, 12).map(function (x) { return clip(x, 60); }), draft: String(o.draft || '').trim().slice(0, 4000) };
+    var idea = { title: clip(String(o.title || '').replace(/[《》]/g, ''), 60), pitch: clip(o.pitch || '', 120), scenes: ideaLines(o.scenes).slice(0, 8).map(function (x) { return clip(x, 120); }), lines: ideaLines(o.lines).slice(0, 12).map(function (x) { return clip(x, 60); }), draft: String(o.draft || '').trim().slice(0, DRAFT_MAX) };
     if (idea.draft && !idea.lines.length) idea.lines = draftLines(idea.draft);
     return idea;
   }
@@ -672,10 +674,31 @@ var PIANCHANG_CORE = (function () {
   function ideaLineup(t) { var m = String(t || '').match(/一男一女|一男两女|一男二女|两男一女|二男一女|一男三女/); if (!m) return ''; return { '一男二女': '一男两女', '二男一女': '两男一女' }[m[0]] || m[0]; }
   // 草稿里写了档位就用草稿的
   function ideaTier(t) { var m = String(t || '').match(/档位\s*[：:]\s*([^｜|\n]+)/), x = m ? m[1].replace(/\s+/g, '') : ''; return x ? TIERS.find(function (k) { return x.indexOf(k.replace(/\s+/g, '')) === 0; }) || '' : ''; }
-  function draftSceneN(t) { return (String(t || '').match(/^\s*#\s*\d{1,2}/mg) || []).length; }
+  function draftSceneN(t) { return (String(t || '').match(/^\s*(?:#\s*\d{1,2}|第\s*[0-9一二三四五六七八九十]{1,3}\s*场)/mg) || []).length; }
+  // v0.1.29：草稿的阵容。写明了「两男一女」照写的；「角色：」一行数她、他；再看「男二」「两个男人」这类词；都没有就一男一女（第三个人当配角），不随机抽多人
+  function draftLineup(t) {
+    t = String(t || '');
+    var x = ideaLineup(t); if (x) return x;
+    var rl = (t.match(/角色\s*[：:]([^\n]+)/) || [])[1], nF = 0, nM = 0;
+    if (rl) { nF = (rl.match(/(?:^|[；;])\s*她/g) || []).length; nM = (rl.match(/(?:^|[；;])\s*他/g) || []).length; }
+    if (!nF && !nM) { nM = /男二|第二个男|两个男|两名男|双男|男优位·二/.test(t) ? 2 : 1; nF = /女三|三个女|三名女/.test(t) ? 3 : /女二|第二个女|两个女|两名女|双女/.test(t) ? 2 : 1; }
+    nF = Math.max(1, nF); nM = Math.max(1, nM);
+    return nM >= 2 ? '两男一女' : nF >= 3 ? '一男三女' : nF === 2 ? '一男两女' : '一男一女';
+  }
+  // v0.1.29：草稿是不是第一视角片。只认「第一视角 / 第一人称 / POV / 视角：主观」；「主观镜头」是普通片里的一种机位，不算
+  function draftPov(t) { return /第一视角|第一人称|POV|视角\s*[：:]\s*主观/i.test(String(t || '')); }
+  // v0.1.29（亚伦：草稿里写了离异少妇、逃犯、巡警，出来的剧本成了隔壁人妻、外卖员）：交给编剧补全时草稿就是这一部的故事，
+  //   故事那几格（企划、事件、场景、她是、他是、关系、开场、服装、收尾、限制、特摄、随机视角）整个不抽；只留玩法、姿势、特征、规矩这类，给编剧挑着补
+  var DRAFT_DROP = /^(?:企划|作品|环节|环节二|事件|场景|换场|她是|他是|关系|开场|服装|收尾|限制|视角)(?:·|$)/;
+  function isDraft(x) { return !!(x && x.idea && x.idea.draft); }
   // 点子盖到抽好的格子上：片名、卖点盖住「企划」那一格；场数不少于玩家写的场数（最多 8 场）
   function applyIdea(sl, idea) {
     sl.idea = idea;
+    if (idea.draft) {
+      sl.pairs = sl.pairs.filter(function (p) { return !DRAFT_DROP.test(p[0]); });
+      sl.toku = false; sl.pov = draftPov(idea.draft);
+      if (sl.pov) { var at = sl.pairs.findIndex(function (p) { return p[0] === '长度'; }) + 1; sl.pairs.splice(at, 0, ['视角', POV]); }
+    }
     if (idea.pitch || idea.title) sl.pairs.forEach(function (p) { if (p[0] === '企划') p[1] = idea.pitch || idea.title; });
     var need = Math.max(idea.scenes.length, idea.draft ? draftSceneN(idea.draft) : 0);
     if (need > sl.n) { sl.n = Math.min(8, need); sl.pairs.forEach(function (p) { if (p[0] === '场数') p[1] = String(sl.n); }); }
@@ -683,7 +706,7 @@ var PIANCHANG_CORE = (function () {
   }
   function ideaBlock1(idea) {
     if (!idea) return '';
-    if (idea.draft) return '【玩家的草稿】（玩家自己写的，格式可能不全）\n' + idea.draft + '\n草稿是这一部的底子：片名、角色、档位、玩家写了的场照用，场名和场号可以理顺；草稿里没写的照【抽到的】补全，跟草稿冲突的格子不用。草稿里的台词，第二步写到那一场时原样用上。\n';
+    if (idea.draft) return '【玩家的草稿】（玩家自己写的，格式可能不全；这一部就照它拍）\n' + idea.draft + '\n【草稿怎么用】\n- 片名、人物、身份、地方、情节都照草稿。「角色」一行就是草稿里的人：身份、年龄、性格原样搬过来，换成格式就行；草稿没起名字的起个中文名。\n- 草稿里有场次的照草稿排，场名和场号可以理顺；草稿没写到的场你来补，补的场接着草稿的故事往下走。\n- 草稿里的台词，第二步写到那一场时原样用上。\n';
     var a = [];
     if (idea.title) a.push('片名：《' + idea.title + '》（照用）');
     if (idea.pitch) a.push('卖点：' + idea.pitch + '（照这个意思写顺）');
@@ -702,7 +725,7 @@ var PIANCHANG_CORE = (function () {
     var idea = sc.idea; if (!idea) return '';
     var last = n === Math.max.apply(null, (sc.scenes || []).map(function (x) { return x.n; }).concat([n]));
     var un = ideaUnused(sc, n), a = [];
-    if (idea.draft) a.push('【玩家的草稿】\n' + Array.from(idea.draft).slice(0, 1500).join('') + '\n草稿里写了这一场的，照草稿的意思补全、润色。');
+    if (idea.draft) a.push('【玩家的草稿】\n' + idea.draft + '\n人物、身份照草稿。草稿里写了这一场的，照草稿的意思补全、润色。');
     if (!idea.draft && idea.scenes.length) a.push('【玩家写的场】' + idea.scenes.map(function (x) { return '「' + x + '」'; }).join('、') + '\n这一场要是其中之一，意思不换，你只补全和润色。');
     if (un.length) a.push('【要用上的台词】' + un.map(function (x) { return '「' + x + '」'; }).join('、') + '\n' + (last ? '这是最后一场，上面还没用上的台词这一场都要用上。' : '放得进这一场的就用上，放不进的留给后面的场。') + '台词原样出现，可以改标点和一两个字让它读顺；谁说的照玩家写的。');
     return a.length ? a.join('\n') + '\n' : '';
@@ -742,6 +765,13 @@ var PIANCHANG_CORE = (function () {
     '喘ぎは一場に一行の見本だけ。実のある言葉を混ぜ、同じ声を二度使わない。',
     '劇中は不倫でも催眠でもいい。現場は全員合意で、大頭菜で止まる。',
   ].join('\n');
+  // v0.1.29：交给编剧补全（有草稿）把片名样例、「格子挑着用」两行换掉：片名、人物照草稿，格子只补草稿没写到的
+  var STYLE_JA_DRAFT = STYLE_JA.split('\n').map(function (l) {
+    if (/^タイトルは/.test(l)) return 'タイトルはプレイヤーの草稿にあるものをそのまま使う。';
+    if (/^抽選の格子/.test(l)) return '人物、身分、場所、筋はプレイヤーの草稿どおり。抽選の格子は草稿に書いていない所だけに使う。';
+    return l;
+  }).join('\n');
+  function styleOf(x) { return isDraft(x) ? STYLE_JA_DRAFT : STYLE_JA; }
   // 第一视角片才带
   var STYLE_JA_POV = '第一视角（POV）撮影。カメラは男の目。彼女はレンズを見て「你」に話しかけ、顔も手もレンズに近づける。男の台詞はほとんど書かない。';
   var STYLE_JA_MULTI = [
@@ -750,6 +780,9 @@ var PIANCHANG_CORE = (function () {
   ].join('\n');
   var RULE_LINE = '【片场规矩】全员成年。安全词全卡只有「大头菜」，剧里剧外谁喊都停。剧本里不用另写安全词。';
   var SYS_WRITE = '你给《声色片场》写 AV 拍摄剧本：架空的日本成人影像业，人名用中文名。AV 剧本是企划，不是故事。格子是代码随机抽的，你先排成片头和分场表。';
+  // v0.1.29：交给编剧补全（玩家有草稿）换一句：先说草稿是底子，格子只是备用
+  var SYS_DRAFT = '你给《声色片场》写 AV 拍摄剧本：架空的日本成人影像业，人名用中文名。玩家已经写了草稿，你照草稿把这一部排成片头和分场表：草稿里的人和事照用，草稿没写到的你来补。';
+  function sysOf(x) { return isDraft(x) ? SYS_DRAFT : SYS_WRITE; }
   // v3 删掉了两条剧情向的（「之间」全片倒过来一次、给男优位·主两次改局面的选择）
   var MULTI_RULES = [
     '【多人】',
@@ -769,7 +802,7 @@ var PIANCHANG_CORE = (function () {
   function headFormat(sl) {
     var multi = sl.multi, ti = tierIdx(sl.tier), pov = !!sl.pov;
     var me = '男优位·主' + (pov ? '，镜头就是他的眼睛' : '');
-    var f = ['【格式】', '企划：《片名》（货架类目，空一格，再接情境，比如《隔壁的人妻 热水器坏了，来借浴室》）', '档位：' + sl.tier.replace(' ', '') + '｜约N分钟·' + sl.n + '场'];
+    var f = ['【格式】', isDraft(sl) ? '企划：《片名》（草稿里有片名就照用）' : '企划：《片名》（货架类目，空一格，再接情境，比如《隔壁的人妻 热水器坏了，来借浴室》）', '档位：' + sl.tier.replace(' ', '') + '｜约N分钟·' + sl.n + '场'];
     if (multi) f.push('阵容：' + sl.lineup);
     f.push('分类：标签｜标签');
     if (pov) f.push('视角：第一视角');   // 普通片不写视角这一行
@@ -811,12 +844,14 @@ var PIANCHANG_CORE = (function () {
   function buildStep1(sl) {
     var ti = tierIdx(sl.tier), poses = sl.poses || slotPoses(sl);
     var cam = poseCamLines(poses);
-    var u = '【调子】' + sl.tier + '：' + TONE[sl.tier] + '\n' + STYLE_JA + '\n' + (sl.pov ? STYLE_JA_POV + '\n' : '') + (sl.multi ? STYLE_JA_MULTI + '\n' : '') + RULE_LINE + '\n' +
-      '【抽到的】' + slotBraces(sl) + '\n' + ideaBlock1(sl.idea) + tokuBlock1(sl) +
+    var u = '【调子】' + sl.tier + '：' + TONE[sl.tier] + '\n' + styleOf(sl) + '\n' + (sl.pov ? STYLE_JA_POV + '\n' : '') + (sl.multi ? STYLE_JA_MULTI + '\n' : '') + RULE_LINE + '\n' +
+      (isDraft(sl) ? ideaBlock1(sl.idea) + '【备用格子】' + slotBraces(sl) + '\n草稿没写到的玩法、姿势、规矩，从备用格子里挑用得上的；草稿写了的照草稿，格子不用。\n'
+        : '【抽到的】' + slotBraces(sl) + '\n' + ideaBlock1(sl.idea) + tokuBlock1(sl)) +
       (cam.length ? '【姿势配机位】' + cam.join('／') + '\n' : '') +
       '【分类】从这些里挑这一部有的（几个都行）：' + tagNames(ti).join(' ') + '\n' +
-      '抽到的格子挑用得上的用；跟企划对不上、硬塞进去会别扭的那一两样就不用，不用解释它们为什么凑在一起。事件只当开拍的理由，一两句交代完。开场用在 #1，收尾用在最后一场，拍摄限制全片都守；片场意外用得上就写进某一场的「变」。' +
-      (ti === 0 ? '企划、环节、环节二就是三段节目。' : '') + '\n' +
+      (isDraft(sl) ? '片场意外用得上就写进某一场的「变」。\n'
+        : '抽到的格子挑用得上的用；跟企划对不上、硬塞进去会别扭的那一两样就不用，不用解释它们为什么凑在一起。事件只当开拍的理由，一两句交代完。开场用在 #1，收尾用在最后一场，拍摄限制全片都守；片场意外用得上就写进某一场的「变」。' +
+          (ti === 0 ? '企划、环节、环节二就是三段节目。' : '') + '\n') +
       headFormat(sl) + '\n' +
       '【规矩】\n- 这一步只写片头和分场表，不写台词。正好 ' + sl.n + ' 场。\n' +
       orderRule(ti) + '\n' +
@@ -824,7 +859,7 @@ var PIANCHANG_CORE = (function () {
       '- 场名用这一场的段落或玩法，两三个字。\n' +
       '- 故事时间压在一次拍摄之内：几个小时，最多一晚。场景最多三处。\n' +
       '- 全员成年。只输出这一段，从「企划：」开始。' + (sl.multi ? '\n' + MULTI_RULES : '');
-    return { sys: SYS_WRITE, user: u };
+    return { sys: sysOf(sl), user: u };
   }
   function slotPoses(sl) { return (sl.pairs || []).filter(function (p) { return /^姿势/.test(p[0]); }).map(function (p) { return p[1]; }); }
   var STEP1_RETRY = '\n\n（上一次的格式没对上。这次请从「企划：」开始，片头几行，一行 ---，然后 #1 #2 … 每场几行：场名行、在场、玩法、姿势（有本番才写）、要。）';
@@ -863,7 +898,7 @@ var PIANCHANG_CORE = (function () {
     var hasMishap = !!s && Number(sc.mishapScene) === n;   // 第一步排完以后由 pickMishapScene 定落在哪一场
     var tone = TONE[sc.tier] || TONE['R18 常见XP'];
     var cam = poseCamLines(scenePoses(s && s.f['姿势']));
-    var u = '【调子】' + (sc.tier || 'R18 常见XP') + '：' + tone + '\n' + STYLE_JA + '\n' + (pov ? STYLE_JA_POV + '\n' : '') + (multi ? STYLE_JA_MULTI + '\n' : '') + RULE_LINE + '\n' +
+    var u = '【调子】' + (sc.tier || 'R18 常见XP') + '：' + tone + '\n' + styleOf(sc) + '\n' + (pov ? STYLE_JA_POV + '\n' : '') + (multi ? STYLE_JA_MULTI + '\n' : '') + RULE_LINE + '\n' +
       '【片头】\n' + sc.headText + '\n' +
       '【分场表】' + (sc.scenes || []).map(sceneTableLine).join('　') + '\n' +
       '【上一场的钩】' + (prev && prev.f['钩'] ? prev.f['钩'] : '无') + '\n' +
@@ -882,7 +917,7 @@ var PIANCHANG_CORE = (function () {
       (pov ? '- 第一视角片：她看着镜头说话，叫「你」；他最多一句画外音，写成「他（画外）：」。\n' : '') +
       (isTokuSc(sc) ? '- 特摄片：变身口令、必杀技名、怪兽的吼声写得进台词；镜头拍得到战斗服、头套、魔杖、布景和烟。\n' : '') +
       '- 全员成年。只输出这一场，从「#' + n + '」开始。' + (multi ? '\n' + MULTI_RULES : '');
-    return { sys: SYS_WRITE + '这次只写其中一场。', user: u };
+    return { sys: sysOf(sc) + '这次只写其中一场。', user: u };
   }
   var STEP2_RETRY = '\n\n（上一次的格式没对上。这次只写这一场：第一行「#n 场名｜地点」，然后 在场/玩法/姿势/要，几句「名字：「台词」」，最后 镜、钩。）';
   // 第一步交回来以后：分类照白名单过一遍，清单外的丢掉，个数不设上限（Fan 10-24「不限制标签数量」）；不到两个的，从企划名、卖点、抽到的企划里认标签补上（剧本系统 v3 第六节第 9 条）
@@ -1660,7 +1695,7 @@ var PIANCHANG_CORE = (function () {
     poseFamily: poseFamily, POSE_CAM: POSE_CAM, poseCamLines: poseCamLines, scenePoses: scenePoses, drawPoses: drawPoses, tagNames: tagNames, fixTags: fixTags, isPovSc: isPovSc, POV: POV, povOf: povOf, tagFix: tagFix, headForShoot: headForShoot, ncKey: ncKey, NC_RECENT: NC_RECENT,
     STYLE_JA: STYLE_JA, STYLE_JA_POV: STYLE_JA_POV, MULTI_RULES: MULTI_RULES, scFilterOk: scFilterOk, scFilterOn: scFilterOn, scFilterBar: scFilterBar, scFilterClick: scFilterClick,
     buildStep1: buildStep1, buildStep2: buildStep2, STEP1_RETRY: STEP1_RETRY, STEP2_RETRY: STEP2_RETRY,
-    parseScript: parseScript, parseScene: parseScene, mergeScene: mergeScene, scriptSane: scriptSane, pickMishapScene: pickMishapScene, parseRoles: parseRoles, scriptAllText: scriptAllText, makeIdea: makeIdea, ideaEmpty: ideaEmpty, ideaText: ideaText, ideaLineup: ideaLineup, ideaTier: ideaTier, applyIdea: applyIdea, ideaUnused: ideaUnused, markIdea: markIdea, lineCore: lineCore, cleanRaw: cleanRaw, sgFailKind: sgFailKind, failText: failText,
+    parseScript: parseScript, parseScene: parseScene, mergeScene: mergeScene, scriptSane: scriptSane, pickMishapScene: pickMishapScene, parseRoles: parseRoles, scriptAllText: scriptAllText, makeIdea: makeIdea, ideaEmpty: ideaEmpty, ideaText: ideaText, ideaLineup: ideaLineup, draftLineup: draftLineup, draftPov: draftPov, ideaTier: ideaTier, applyIdea: applyIdea, ideaUnused: ideaUnused, markIdea: markIdea, lineCore: lineCore, cleanRaw: cleanRaw, sgFailKind: sgFailKind, failText: failText,
     markPlayer: markPlayer, castLine: castLine, shootPrompt: shootPrompt, softPose: softPose, softLines: softLines, doneLine: doneLine, statusPrompt: statusPrompt, parseStatus: parseStatus,
     PORTRAIT_N: PORTRAIT_N, PORTRAIT_BASE: PORTRAIT_BASE, portraitOk: portraitOk, portraitUrl: portraitUrl, pickPortrait: pickPortrait, fillPortraits: fillPortraits,
     drawCand: drawCand, drawCands: drawCands, drawTraits: drawTraits, drawSpice: drawSpice, spicePool: spicePool, drawLook: drawLook, portraitFit: portraitFit, pickPortraitFor: pickPortraitFor, reqOfText: reqOfText, archOf: archOf, NC_LAYERS: NC_LAYERS, NC_KEYS: NC_KEYS, NC_LABEL: NC_LABEL, ncLines: ncLines, candLines: candLines, npcFaces: npcFaces, drawXP: drawXP, drawNG: drawNG, filmFee: filmFee, buildCandPrompt: buildCandPrompt, CAND_RETRY: CAND_RETRY, parseCands: parseCands, buildCandFromPrompt: buildCandFromPrompt, parseCandFrom: parseCandFrom, CAND_FROM_RETRY: CAND_FROM_RETRY, parseCandOne: parseCandOne, personLines: personLines,
@@ -7218,9 +7253,11 @@ var PIANCHANG_ONLINE = (function () {
   }
   // 榜上对家的片名要避开的：导演这边所有的片（剪辑室里的、开局上一任留下的也算）和男优演过的片
   function filmTitles(s) { return arr(s && s.dir && s.dir.films).concat(arr(s && s.act && s.act.films)).map(function (f) { return f && f.title; }).filter(Boolean); }
+  // v0.1.29：缓存的键带上全文的指纹（以前只看长度：改一个字长度不变，看到的还是改之前的）
+  function rawKey(t) { var h = 0; for (var i = 0; i < t.length; i++) h = (h * 31 + t.charCodeAt(i)) | 0; return t.length + ':' + h; }
   function parsed(rec) {
     if (!rec) return null;
-    var key = rec.id + ':' + String(rec.raw || '').length;
+    var key = rec.id + ':' + rawKey(String(rec.raw || ''));
     if (!SCRIPT_CACHE[key]) {
       if (Object.keys(SCRIPT_CACHE).length > 80) SCRIPT_CACHE = {};
       var p = C.parseScript(rec.raw); if (p.ok && !p.tier) p.tier = rec.tier || 'R18 常见XP';
@@ -7889,6 +7926,8 @@ var PIANCHANG_ONLINE = (function () {
   function closeSettings() {
     var m = UI.modal;
     if (m && m.kind === 'settings' && !m.warned && llmDirty()) { setFormKeep(); m.warned = true; toast('warning', '片场用的模型改了还没存：点「保存」；不要了就再关一次'); return; }
+    var ed = m && m.kind === 'scedit' && PANEL.querySelector('#pc-scedit');   // v0.1.29：改剧本改了一半点到外面，先提醒一次
+    if (ed && !m.warned && ed.value !== m.orig) { m.text = ed.value; m.warned = true; toast('warning', '剧本改的还没存：点「存」；不要了就再关一次'); return; }
     UI.modal = null; render();
   }
   function clearKeys() {
@@ -8579,15 +8618,45 @@ var PIANCHANG_ONLINE = (function () {
   }
 
   // ═════════════════════════ 自己写剧本 ═════════════════════════
+  // 自己写的、改过的剧本存之前过一遍：认不出来、没有「她」、没有档位就不存
+  function customErr(r) {
+    if (!r.ok) return '没认出来：' + r.why + '。格式照剧本库那几部：企划/档位/卖点/角色……一行 ---，然后 #1 场名｜地点、在场、情、新、要。';
+    if (!r.roles.some(function (x) { return x.side === '她'; })) return '「角色」一行里至少要有一个「她＝名字（年龄，身份）」：开机选角、片酬都看这一行。';
+    if (!r.tier) return '「档位」一行没认出来：写 全年龄 / R15 / R18常见XP / R18 BDSM / 深渊 里的一个。';
+    return '';
+  }
   async function saveCustom(text) {
-    var r = C.parseScript(text);
-    if (!r.ok) { UI.modal.err = '没认出来：' + r.why + '。格式照剧本库那几部：企划/档位/卖点/角色……一行 ---，然后 #1 场名｜地点、在场、情、新、要。'; render(); return; }
-    if (!r.roles.some(function (x) { return x.side === '她'; })) { UI.modal.err = '「角色」一行里至少要有一个「她＝名字（年龄，身份）」：开机选角、片酬都看这一行。'; render(); return; }
-    if (!r.tier) { UI.modal.err = '「档位」一行没认出来：写 全年龄 / R15 / R18常见XP / R18 BDSM / 深渊 里的一个。'; render(); return; }
+    var r = C.parseScript(text), err = customErr(r);
+    if (err) { UI.modal.err = err; render(); return; }
     var st = readState(), fk = faceKey(st);
     var rec = { id: C.uid('s'), title: r.title, tier: r.tier, lineup: r.lineup, raw: C.scriptAllText(r), source: 'mine', day: st.day };
     await save(function (s) { s[fk].scripts.unshift(rec); if (s[fk].scripts.length > 30) s[fk].scripts = s[fk].scripts.slice(0, 30); });
     UI.modal = null; toast('success', '存进「我写的」：《' + r.title + '》'); render();
+  }
+  // v0.1.29（亚伦：剧本出来以后想改几个小毛病）：「我写的」里的剧本能直接改字。剧本库、买来的、官方的不改；
+  //   正在拍的那部不让改（拍到第几场、谁演哪个位子都是按这份剧本记的），拍完再改
+  function scEditable(rec) { return !!rec && rec.source !== 'lib' && rec.source !== 'buy' && rec.source !== 'official'; }
+  function scShooting(st, id) { return [st.dir.shoot, st.act.shoot].some(function (sh) { return sh && sh.scriptId === id; }); }
+  function scEditOpen(st, id) {
+    var rec = scriptRec(st, id); if (!scEditable(rec)) return;
+    if (scShooting(st, id)) { toast('info', '这部正在拍，拍完再改'); return; }
+    var sc = parsed(rec), text = sc ? C.scriptAllText(sc) : String(rec.raw || '');
+    UI.modal = { kind: 'scedit', id: id, text: text, orig: text }; render();
+  }
+  async function scEditSave() {
+    var m = UI.modal, ta = PANEL.querySelector('#pc-scedit'); if (!m || m.kind !== 'scedit') return;
+    m.text = ta ? ta.value : m.text;
+    var r = C.parseScript(m.text), err = customErr(r);
+    if (err) { m.err = err; render(); return; }
+    var st = readState();
+    if (scShooting(st, m.id)) { m.err = '这部正在拍，拍完再改（改的字还在框里，可以先复制下来）。'; render(); return; }
+    var raw = C.scriptAllText(r), id = m.id;
+    await save(function (s) {
+      var x = s.dir.scripts.concat(s.act.scripts).find(function (y) { return y.id === id; }); if (!x) return;
+      x.title = r.title; x.tier = r.tier; x.lineup = r.lineup; x.raw = raw; x.edited = s.day;
+      if (x.mishap) x.mishapScene = C.pickMishapScene(r, x.mishap);
+    });
+    UI.modal = { kind: 'script', id: id }; toast('success', '改好了：《' + r.title + '》'); render();
   }
 
   // ═════════════════════════ 面板：样式 ═════════════════════════
@@ -9416,6 +9485,7 @@ var PIANCHANG_ONLINE = (function () {
       '<div class="row" style="margin-top:8px"><button class="btn sm" data-act="sc-view" data-id="' + rec.id + '">看剧本</button><button class="btn sm" data-act="sc-post" data-id="' + rec.id + '" title="写进正文最新一楼，折叠着">📄 发剧本</button>' +
       (dirFace && !rec.onlyActor ? '<button class="btn sm pri" data-act="sc-shoot" data-id="' + rec.id + '">拿去拍</button><button class="btn sm" data-act="sc-take" data-id="' + rec.id + '">试戏</button>' : '') +
       (rec.source !== 'lib' && full < sc.scenes.length ? '<button class="btn sm" data-act="sc-fill" data-id="' + rec.id + '">补写台词</button>' : '') +
+      (scEditable(rec) ? '<button class="btn sm" data-act="sc-edit" data-id="' + rec.id + '">编辑</button>' : '') +
       (rec.source !== 'lib' ? '<button class="btn sm" data-act="sc-del" data-id="' + rec.id + '">删</button>' : '') + '</div></div>';
   }
   // 写剧本弹窗顶上的三个小页签（v0.1.15，设计稿第 8 节）
@@ -9465,7 +9535,8 @@ var PIANCHANG_ONLINE = (function () {
     UI.modal.text = text;
     if (!String(text).trim()) { UI.modal.err = '先写点什么：片名、几场、几句台词都行。'; render(); return; }
     var idea = C.makeIdea({ draft: text }), tier = C.ideaTier(text) || UI.gen.tier;
-    var sl = C.drawSlots(tier, { identity: identity(st), lineup: C.ideaLineup(text), pov: /第一视角|主观/.test(text) });
+    // v0.1.29：阵容从草稿里认（认不出来就一男一女，不随机抽多人）；视角、故事那几格交给 applyIdea 按草稿定
+    var sl = C.drawSlots(tier, { identity: identity(st), lineup: C.draftLineup(text) });
     C.applyIdea(sl, idea);
     UI.modal = null; UI.gen.draft = ''; render();
     writeScript(faceKey(st), sl);
@@ -9799,7 +9870,8 @@ var PIANCHANG_ONLINE = (function () {
     else if (m.kind === 'byscript') body = byScriptHtml(st, m);
     else if (m.kind === 'sign') { var c = CUR && CUR.cands.find(function (x) { return x.id === m.id; }); body = '<div class="eb">SIGN</div><h2 class="h">签下 ' + esc(c ? c.realName : '') + '</h2><div class="sub">起一个艺名（1 到 6 个字）。签约金 ' + esc(money(c ? c.signFee : 0)) + '，一部片酬 ' + esc(money(c ? c.fee : 0)) + '。明天（' + esc(C.mdText(st.day + LAW.signToShoot)) + '）起就能进棚。</div><input type="text" id="pc-stage-in" maxlength="6" placeholder="艺名" style="margin-top:10px">' + (m.err ? '<div class="err">' + esc(m.err) + '</div>' : '') + '<div class="act"><button class="btn" data-act="modal-x">再想想</button><button class="btn pri" data-act="sign-ok" data-id="' + esc(m.id) + '">签</button></div>'; }
     else if (m.kind === 'endday') body = '<div class="eb">END OF DAY</div>' + (m.why ? '<div class="sub">正文里写到了 ' + esc(m.why) + '，离片场的今天（' + esc(C.mdShort(st.day)) + '）差 ' + m.n + ' 天。跟着跳吗？AI 写错了日期就点「算了」。</div>' : '') + '<h2 class="h">' + (m.n > 1 ? '跳到 ' + esc(C.mdText(st.day + m.n)) + '（' + m.n + ' 天）' : '结束今天') + '</h2><div class="sub">' + (m.n > 1 ? '中间每一天照样过：月初结账、发售、片酬到账、新片约都会算。' : '明天是 ' + esc(C.mdText(st.day + 1)) + '。') + (markText(st, st.day + m.n) ? '那天：' + esc(markText(st, st.day + m.n)) : '') + '</div>' + (curShoot(st) ? '<div class="err">片场还在拍：过了今天也接着算这一部。</div>' : '') + '<div class="act"><button class="btn" data-act="modal-x">算了</button><button class="btn pri" data-act="endday-ok" data-n="' + m.n + '"' + (m.clock ? ' data-clock="' + esc(m.clock) + '"' : '') + '>好</button></div>';
-    else if (m.kind === 'script') { var rec = scriptRec(st, m.id), sc = parsed(rec); body = '<div class="eb">SCRIPT</div><h2 class="h">《' + esc(sc ? sc.title : '') + '》</h2>' + (rec && rec.slots ? '<div class="faint" style="margin-bottom:6px">抽卡单：' + esc(rec.slots) + '</div>' : '') + '<div class="script">' + esc(rec && sc ? C.markIdea(C.scriptAllText(sc), rec.idea) : '') + '</div><div class="act">' + (sc ? '<button class="btn" data-act="sc-post" data-id="' + esc(m.id) + '">📄 发剧本</button>' : '') + '<button class="btn" data-act="modal-x">关上</button></div>'; }
+    else if (m.kind === 'script') { var rec = scriptRec(st, m.id), sc = parsed(rec); body = '<div class="eb">SCRIPT</div><h2 class="h">《' + esc(sc ? sc.title : '') + '》</h2>' + (rec && rec.slots ? '<div class="faint" style="margin-bottom:6px">抽卡单：' + esc(rec.slots) + '</div>' : '') + '<div class="script">' + esc(rec && sc ? C.markIdea(C.scriptAllText(sc), rec.idea) : '') + '</div><div class="act">' + (sc && scEditable(rec) ? '<button class="btn" data-act="sc-edit" data-id="' + esc(m.id) + '">✏ 编辑</button>' : '') + (sc ? '<button class="btn" data-act="sc-post" data-id="' + esc(m.id) + '">📄 发剧本</button>' : '') + '<button class="btn" data-act="modal-x">关上</button></div>'; }
+    else if (m.kind === 'scedit') { var erec = scriptRec(st, m.id), esc0 = parsed(erec); body = '<div class="eb">EDIT</div><h2 class="h">✏ 改剧本《' + esc(esc0 ? esc0.title : (erec && erec.title) || '') + '》</h2><div class="sub">直接改字，改完点「存」。片头那几行、一行 ---、每场开头的「#1 场名｜地点」要留着，脚本靠它们认剧本；「角色」一行改了名字，场里台词前面的名字也跟着改。</div><textarea id="pc-scedit" style="min-height:360px;margin-top:10px">' + esc(m.text || '') + '</textarea>' + (m.err ? '<div class="err">' + esc(m.err) + '</div>' : '') + '<div class="act"><button class="btn" data-act="modal-x">算了</button><button class="btn pri" data-act="sc-edit-save">存</button></div>'; }
     else if (m.kind === 'gen' && m.mode === 'idea') body = genTabs('idea') + ideaBody(m);
     else if (m.kind === 'gen') {
       var sl = m.slots;
@@ -9876,6 +9948,7 @@ var PIANCHANG_ONLINE = (function () {
     var t = curTab(st), main = PANEL.querySelector('.pc-main'), scroll = main ? main.scrollTop : 0, sameTab = PANEL.getAttribute('data-cur') === t;
     var dlg = PANEL.querySelector('.pc-dialog'), dScroll = dlg ? dlg.scrollTop : 0;
     var custom = PANEL.querySelector('#pc-custom'); if (custom && UI.modal && UI.modal.kind === 'custom') UI.modal.text = custom.value;
+    var scEd = PANEL.querySelector('#pc-scedit'); if (scEd && UI.modal && UI.modal.kind === 'scedit') UI.modal.text = scEd.value;
     var coIn = PANEL.querySelector('#pc-coname'); if (coIn && UI.coRename) UI.coRename.draft = coIn.value;
     var fIn = PANEL.querySelector('#pc-face-url'); if (fIn && UI.face) UI.face.url = fIn.value;
     var body = t === 'dd' ? '' : ({ co: renderCo, cal: renderCal, casting: renderCasting, cast: renderCast, plan: renderPlan, take: renderTake, shoot: renderShoot, market: renderMarket, call: renderCall, offers: renderOffers, resume: renderResume, wallet: renderWallet }[t] || renderCal)(st);
@@ -10132,6 +10205,8 @@ var PIANCHANG_ONLINE = (function () {
       case 'custom-open': UI.modal = { kind: 'custom', text: UI.gen.draft || '' }; render(); break;
       case 'custom-save': { var ta = PANEL.querySelector('#pc-custom'); UI.modal.text = ta ? ta.value : ''; saveCustom(UI.modal.text); break; }
       case 'sc-view': UI.modal = { kind: 'script', id: id }; render(); break;
+      case 'sc-edit': scEditOpen(st, id); break;
+      case 'sc-edit-save': scEditSave(); break;
       case 'todo-cast': todoMark('cast').then(render); break;
       case 'todo-lib': UI.sh.sid = 'lib4'; UI.sh.cast = st.dir.plan0 ? clone(st.dir.plan0.cast) : {}; UI.tab = 'shoot'; lsSet(TAB_KEY, UI.tab); todoMark('script').then(render); break;
       case 'sc-shoot': if (todoOn(st)) todoMark('script'); UI.sh.sid = id; UI.sh.cast = {}; if (st.dir.plan0 && st.dir.plan0.scriptId === id) UI.sh.cast = clone(st.dir.plan0.cast); prefillForScript(st, id); UI.tab = 'shoot'; lsSet(TAB_KEY, UI.tab); render(); break;
@@ -10789,7 +10864,7 @@ var PIANCHANG_ONLINE = (function () {
   // 面板 / 叮叮里动了存档的点击记一笔时间（捕获阶段，先于各自的处理）。纯翻页、开关弹层、设置、联机市场（联机的不撤）、换图不算
   var RB_NAV = { close: 1, 'theme-open': 1, 'theme-close': 1, 'theme-set': 1, settings: 1, 'set-save': 1, 'key-clear': 1, 'llm-test': 1, 'llm-models': 1, 'tips-again': 1, 'tips-ok': 1, 'modal-x': 1, 'modal-bg': 1,
     ledger: 1, 'cal-prev': 1, 'cal-next': 1, endday: 1, skip: 1, 'to-co': 1, 'co-rename': 1, 'co-rename-x': 1, 'cast-script': 1, 'cs-call': 1, 'tk-mode': 1, 'tk-who': 1, 'tk-n': 1, 'mk-pov': 1, scf: 1,
-    profile: 1, 'to-take': 1, 'gen-open': 1, 'idea-open': 1, 'gen-mode': 1, 'gen-tier': 1, 'idea-pov': 1, 'idea-len': 1, 'gen-toku': 1, 'gen-draw': 1, 'custom-open': 1, 'sc-view': 1, 'sc-take': 1, 'sc-shoot': 1,
+    profile: 1, 'to-take': 1, 'gen-open': 1, 'idea-open': 1, 'gen-mode': 1, 'gen-tier': 1, 'idea-pov': 1, 'idea-len': 1, 'gen-toku': 1, 'gen-draw': 1, 'custom-open': 1, 'sc-view': 1, 'sc-edit': 1, 'sc-take': 1, 'sc-shoot': 1,
     'cand-sign': 1, 'sh-drop-ask': 1, 'wb-retry': 1, 'sc-post': 1, 'rb-ok': 1, 'rb-keep': 1 };
   var RB_DDX = { flush: 1, send: 1, stk: 1, 'tf-go': 1, 'vc-go': 1, reroll: 1, recall: 1, claim: 1, inv: 1, call: 1, 'c-popok': 1, 'c-roll': 1, 'c-hang': 1, 'set-clear': 1 };
   function touchAct(e) {
