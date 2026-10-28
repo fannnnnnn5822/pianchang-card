@@ -558,12 +558,13 @@ var PIANCHANG_LISTS = {
 
   // ── 日历上的邀约：每天 0~2 条（纯代码，不花 token）。text 是叮叮里收到的那句；scene 是点「现在就去」挂进正文的那一场 ──
   // who：谁约你；face：导演 / 男优 / 社长 / 空=都行（几个身份都行就用 | 连起来）；where：在哪；ahead：约在几天后（0=今天）
+  // need：'film' = 手里有上过架的片子才约（v0.1.42，10091009mc：新公司一部没拍完，方正就来说「上一部有一帧码打薄了」）
   invites: [
     { who: '戴晶', face: '导演', where: '社长室', text: '戴晶：下午来一趟社长室，我有个企划，你先别急着说不。', scene: '戴晶把一份企划书推过来，标题荒唐，她要你当场说拍不拍、怎么拍。' },
     { who: '邱德海', face: '导演', where: '三楼剪辑室', text: '邱德海：预告剪了三个版本，来挑一个。挑错了我当面说。', scene: '邱德海在剪辑室放三版预告，一边放一边骂，等你挑。' },
     { who: '尹椿', face: '', where: '下北泽的小剧场', text: '尹椿：我的恐怖片今晚放映，来不来？片尾有你的名字。', scene: '尹椿拉你看她的恐怖片，散场后在门口抽烟，问你看懂了没有。' },
     { who: '潘一树', face: '导演|社长', where: '企划部', text: '潘一树：新企划！这次真的能火，你先听我讲三分钟。', scene: '潘一树穿着新买的大衣讲他的新企划，讲到一半问你觉得他这件衣服怎么样。' },
-    { who: '方正', face: '导演|社长', where: '审查中心', text: '方正：你们上一部有一帧码打薄了，来一趟，我们一帧一帧看。', scene: '方正在审查中心的小屋里一帧一帧地放，指着屏幕问你这一帧是什么意思。' },
+    { who: '方正', face: '导演|社长', need: 'film', where: '审查中心', text: '方正：你们上一部有一帧码打薄了，来一趟，我们一帧一帧看。', scene: '方正在审查中心的小屋里一帧一帧地放，指着屏幕问你这一帧是什么意思。' },
     // 社长线：戴晶是二号棚的房东，也是对家；尹椿、邱德海可以按部请来导
     { who: '戴晶', face: '社长', where: '二号棚', text: '戴晶：二号棚的灯坏了一盏，按租约你赔。顺便聊聊，我那边有个本子拍不过来。', scene: '戴晶在二号棚门口指着坏掉的那盏灯算赔多少，算完把一份银星拍不过来的企划递过来，问{{user}}接不接、分成怎么算。' },
     { who: '尹椿', face: '社长', where: '黄金街的小酒馆', text: '尹椿：缺导演就说。按部算钱，恐怖片的本子我打八折。', scene: '尹椿在黄金街的小酒馆跟{{user}}谈外请导演的价钱，谈到一半开始讲她一直想拍、没人肯投的那部恐怖片。' },
@@ -9701,7 +9702,8 @@ var PIANCHANG_ONLINE = (function () {
     var id = identity(s); if (!id) return [];
     if (s.invDone >= s.day) return [];
     s.invDone = s.day;
-    var pool = (L.invites || []).filter(function (t) { return !t.face || String(t.face).split('|').indexOf(id) >= 0; }), out = [];
+    var hasFilm = arr(s.dir && s.dir.films).some(function (f) { return f && (f.status === 'released' || f.status === 'pulled'); });   // v0.1.42：方正那条要有上过架的片子
+    var pool = (L.invites || []).filter(function (t) { return (!t.face || String(t.face).split('|').indexOf(id) >= 0) && (t.need !== 'film' || hasFilm); }), out = [];
     var n = C.rndFloat() < 0.55 ? 1 : (C.rndFloat() < 0.3 ? 2 : 0);
     C.drawN(pool, n).forEach(function (t) {
       var ahead = C.rndFloat() < 0.6 ? 0 : 1 + C.randInt(2);
