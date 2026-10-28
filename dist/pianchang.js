@@ -1226,7 +1226,7 @@ var PIANCHANG_SECRETS = [
     pay: 0 },
 
   // ─────────────── biz · 跟这行有关的 ───────────────
-  { id: 'mole', k: 'biz', t: '鼎盛派来的卧底', ti: 0, w: 1,
+  { id: 'mole', k: 'biz', t: '鼎盛派来的卧底', ti: 0, w: 4,   // Fan 10-28「卧底很好玩」：稀有调成常见
     fit: '三流侦探事务所助理|艺人经纪|电话推销员|合约被前经纪转手卖给了片商', need: '', avoid: '当红单体', only: '', lv: null, hy: null,
     s1: '找机会让 {{user}} 看到她在化妆间角落对着手机备忘录打字，标题是「本周竞品片场动向」，里面写的却是「今天盒饭的红烧肉比鼎盛食堂好吃三倍」。',
     n1: '她的「竞品动向」备忘录在夸盒饭', k1: '竞品|红烧肉',
@@ -2114,7 +2114,7 @@ var PIANCHANG_CORE = (function () {
   //   洗完一个字不剩（整楼包在思维容器里的预设）就退回温和洗：思维容器只脱壳
   var FLOOR_THINK = 'think|thinking|thought|reasoning|cot|analysis|scratchpad';
   function floorDraft(raw) {
-    var base = secStrip(String(raw == null ? '' : raw).replace(/\r/g, '')).replace(/\r/g, '');
+    var base = signStrip(secStrip(String(raw == null ? '' : raw).replace(/\r/g, '')));   // 暗线 / 签约的暗号先擦
     base = walletStrip(base
       .replace(/<style[\s\S]*?<\/style>/gi, '').replace(/<script[\s\S]*?<\/script>/gi, '').replace(/<!--[\s\S]*?-->/g, '')
       .replace(/<details data-pc(?:script|ddlog)[\s\S]*?<\/details>/g, '').replace(/```chat\n[\s\S]*?\n```/g, '')
@@ -3258,6 +3258,16 @@ var PIANCHANG_CORE = (function () {
     return { hits: hits, clean: hits.length ? secStrip(t) : t };
   }
 
+  // v0.1.41（crazyman2333「正文都签约了，脚本里还要重新面试一遍」；Fan「签约暗号你自己决定，不要搞太复杂和出戏」）：
+  //   正文里当场谈定，模型在楼尾写 [签约:名字|签约] 或 [签约:名字|一部]；主脚本擦掉，后台照正文 / 叮叮 / 世界书给她立档，弹一条点了起艺名签
+  var SIGN_MARK = '[\\[［【]\\s*签约\\s*[:：]\\s*([^|｜\\]］】\\n]{1,12}?)\\s*(?:[|｜]\\s*([^\\]］】\\n]{0,8}?))?\\s*[\\]］】]';
+  function signStrip(t) { return String(t == null ? '' : t).replace(new RegExp('\\n?[ \\t]*' + SIGN_MARK + '[ \\t]*', 'g'), ''); }
+  function signScan(raw) {
+    var t = String(raw == null ? '' : raw), re = new RegExp(SIGN_MARK, 'g'), hits = [], m;
+    while ((m = re.exec(t))) { var nm = m[1].replace(/[「」『』《》*]/g, '').trim(); if (nm) hits.push({ name: nm, one: /一部|单部|一次|只拍/.test(m[2] || '') }); }
+    return { hits: hits, clean: hits.length ? signStrip(t) : t };
+  }
+
   // ── 现写：第一层解锁那一刻照她的格子写一条（系统提示、写法参考照 暗线-4a讨论/13-临场-*-轻喜剧.md）──
   var SEC_GEN_SYS = '你是经营游戏《声色片场》的编剧。游戏面向成年玩家，背景是架空的影视片场，所有人物都是成年人。游戏的底色是轻喜剧：片场热闹、好笑，拍片是一份正经工作，涩是这一行的产品，也是乐子。现在给一位签约女演员写一条藏在她身上的「暗线秘密」：一开始玩家不知道，之后在正文里分两次露出来。玩家在游戏里写作 {{user}}，是她的导演或社长。\n\n' +
     '【两层】\n- 第一层：{{user}} 和她一起拍完一部片以后，正文里让 {{user}} 撞见一个看得见的细节，不说破。\n- 第二层：{{user}} 和她聊满 50 轮以后，她自己说出来，或者当着 {{user}} 的面做出来。\n- 正文模型每次只拿到一层，所以两层都要能单独演：第一层只给画面，第二层自己把事情交代清楚。\n\n' +
@@ -3452,7 +3462,7 @@ var PIANCHANG_CORE = (function () {
     poseFamily: poseFamily, POSE_CAM: POSE_CAM, poseCamLines: poseCamLines, scenePoses: scenePoses, drawPoses: drawPoses, tagNames: tagNames, fixTags: fixTags, isPovSc: isPovSc, POV: POV, povOf: povOf, tagFix: tagFix, headForShoot: headForShoot, ncKey: ncKey, NC_RECENT: NC_RECENT,
     STYLE_JA: STYLE_JA, STYLE_JA_POV: STYLE_JA_POV, MULTI_RULES: MULTI_RULES, scFilterOk: scFilterOk, scFilterOn: scFilterOn, scFilterBar: scFilterBar, scFilterClick: scFilterClick,
     buildStep1: buildStep1, buildStep2: buildStep2, STEP1_RETRY: STEP1_RETRY, STEP2_RETRY: STEP2_RETRY,
-    parseScript: parseScript, parseScene: parseScene, mergeScene: mergeScene, scriptSane: scriptSane, pickMishapScene: pickMishapScene, parseRoles: parseRoles, scriptAllText: scriptAllText, makeIdea: makeIdea, ideaEmpty: ideaEmpty, ideaText: ideaText, ideaLineup: ideaLineup, draftLineup: draftLineup, draftPov: draftPov, floorDraft: floorDraft, walletScan: walletScan, walletStrip: walletStrip, applyRec: applyRec, candFromMore: candFromMore, SECRETS: SECRETS, SEC_ID: SEC_ID, SEC_KIND: SEC_KIND, SEC_CAST0: SEC_CAST0, SEC_N2: SEC_N2, SEC_GEN_RETRY: SEC_GEN_RETRY, pickSecret: pickSecret, newSec: newSec, secEntry: secEntry, secStage: secStage, secHint: secHint, secKw: secKw, secScan: secScan, secStrip: secStrip, secText: secText, secRng: secRng, buildSecGen: buildSecGen, parseSecGen: parseSecGen,ideaTier: ideaTier, applyIdea: applyIdea, ideaUnused: ideaUnused, markIdea: markIdea, lineCore: lineCore, cleanRaw: cleanRaw, sgFailKind: sgFailKind, failText: failText,
+    parseScript: parseScript, parseScene: parseScene, mergeScene: mergeScene, scriptSane: scriptSane, pickMishapScene: pickMishapScene, parseRoles: parseRoles, scriptAllText: scriptAllText, makeIdea: makeIdea, ideaEmpty: ideaEmpty, ideaText: ideaText, ideaLineup: ideaLineup, draftLineup: draftLineup, draftPov: draftPov, floorDraft: floorDraft, walletScan: walletScan, walletStrip: walletStrip, applyRec: applyRec, candFromMore: candFromMore, SECRETS: SECRETS, SEC_ID: SEC_ID, SEC_KIND: SEC_KIND, SEC_CAST0: SEC_CAST0, SEC_N2: SEC_N2, SEC_GEN_RETRY: SEC_GEN_RETRY, pickSecret: pickSecret, newSec: newSec, secEntry: secEntry, secStage: secStage, secHint: secHint, secKw: secKw, secScan: secScan, secStrip: secStrip, secText: secText, secRng: secRng, buildSecGen: buildSecGen, parseSecGen: parseSecGen, signScan: signScan, signStrip: signStrip,ideaTier: ideaTier, applyIdea: applyIdea, ideaUnused: ideaUnused, markIdea: markIdea, lineCore: lineCore, cleanRaw: cleanRaw, sgFailKind: sgFailKind, failText: failText,
     markPlayer: markPlayer, castLine: castLine, shootPrompt: shootPrompt, softPose: softPose, softLines: softLines, doneLine: doneLine, statusPrompt: statusPrompt, parseStatus: parseStatus,
     PORTRAIT_N: PORTRAIT_N, PORTRAIT_BASE: PORTRAIT_BASE, portraitOk: portraitOk, portraitUrl: portraitUrl, pickPortrait: pickPortrait, fillPortraits: fillPortraits,
     drawMan: drawMan, drawMen: drawMen, manLines: manLines, gradeLine: gradeLine, drawCand: drawCand, drawCands: drawCands, drawTraits: drawTraits, drawSpice: drawSpice, spicePool: spicePool, drawLook: drawLook, portraitFit: portraitFit, pickPortraitFor: pickPortraitFor, reqOfText: reqOfText, archOf: archOf, NC_LAYERS: NC_LAYERS, NC_KEYS: NC_KEYS, NC_LABEL: NC_LABEL, ncLines: ncLines, candLines: candLines, npcFaces: npcFaces, drawXP: drawXP, drawNG: drawNG, filmFee: filmFee, buildCandPrompt: buildCandPrompt, CAND_RETRY: CAND_RETRY, parseCands: parseCands, buildCandFromPrompt: buildCandFromPrompt, parseCandFrom: parseCandFrom, CAND_FROM_RETRY: CAND_FROM_RETRY, parseCandOne: parseCandOne, personLines: personLines,
@@ -9129,7 +9139,12 @@ var PIANCHANG_ONLINE = (function () {
   function timeAsk(st) {
     return '这条回复写完，最后单独一行写剧情时间 [TIME:HH:MM|M/D]：这条回复结尾那一刻的时间。片场日历上今天是第 ' + st.day + ' 天 = ' + C.mdShort(st.day) + '，现在是 ' + C.mdShort(st.day) + ' ' + st.clock + '；日期从这天往后接，同一天里的事都写 ' + C.mdShort(st.day) + '，故事过了夜才写第二天的日期。' +
       '预设要你在文末写状态栏、变量的照写，这一行另外写，不算在它们里面，格式一字不改。' +   // v0.1.30（crazyman2333：文尾插入数值变量，[TIME] 被挤掉）
-      walletAsk(st);
+      walletAsk(st) + dealAsk(st);
+  }
+  // v0.1.41（crazyman2333「正文都签约了，脚本里还要重新面试一遍」）：正文里当场谈定签约 / 只拍一部，写一行，signFloor 收下、后台立档、弹一条点了签
+  function dealAsk(st) {
+    if (!dirLike(identity(st))) return '';
+    return '\n{{user}}在正文里跟哪位女优当场谈定了签约（或者说好只拍这一部），在 [TIME] 那一行前面单独写一行 [签约:她的名字|签约] 或 [签约:她的名字|一部]，名字照正文里的写；还在谈、没说定的不写，签约金和片酬面板会算。';
   }
   // v0.1.39（10091009mc、crazyman2333「正文赚的钱和脚本赚的钱对不上」，照一掷千金的 [WALLET]）：正文里 {{user}} 自己的钱有进出就写一行，onTimeTag 记账、擦掉
   function walletAsk(st) {
@@ -10312,16 +10327,23 @@ var PIANCHANG_ONLINE = (function () {
     if (!PANEL.classList.contains('open')) openPanel(); else render();
     setTimeout(function () { try { var el = PANEL.querySelector('[data-pc-card="cand"][data-id="' + id + '"]'); if (el && el.scrollIntoView) el.scrollIntoView({ block: 'nearest' }); } catch (e) {} }, 60);
   }
-  async function castIn(c) {
-    var st = readState(), info = castInfo(c, st); if (!info) return;
+  async function castIn(c, o) {
+    o = o || {};
+    var st = readState(), info = castInfo(c, st), deal = o.deal || ''; if (!info) return;
+    if (deal && info.yx) { toast('info', '正文里跟' + c.name + '谈好了，可她签在银星：在「艺人」页「银星映像的女优」里借一部，或者挖过来'); return; }
+    if (deal && info.pend) { var pp = (curCasting(st) || { cands: [] }).cands.find(function (x) { return x && x.id === info.pend; }); if (pp) { pp.deal = deal; await persistCasting(); render(); if (pp.status === 'ok') dealToast(pp); } return; }
     if (info.yx) { UI.tab = 'cast'; lsSet(TAB_KEY, UI.tab); UI.modal = { kind: 'yx', id: info.yx }; if (!PANEL.classList.contains('open')) openPanel(); else render(); return; }   // v0.1.38
     if (info.pend) { goCand(info.pend); return; }
     var cur = curCasting(st);
-    if (cur && cur.busy) { toast('info', '面试间正忙（这一批还在填表），等她们填完再约'); return; }
+    if (cur && cur.busy) {
+      if (deal && (o.tries || 0) < 6) { setTimeout(function () { castIn(c, Object.assign({}, o, { tries: (o.tries || 0) + 1 })); }, 10000); return; }   // 正文里谈好的：面试间这一批填完再来
+      toast('info', '面试间正忙（这一批还在填表），等她们填完再约'); return;
+    }
     if (!cur) cur = CUR = { cands: [] };
     var met = info.met && arr(st.met).find(function (m) { return m && m.id === info.met; });
     if (met) {
       var mp = clone(met); delete mp.metDay; delete mp.err; mp.status = 'ok'; mp.ddFrom = c.id;
+      if (deal) { mp.deal = deal; cur.cands.unshift(mp); await persistCasting(); render(); dealToast(mp); return; }
       cur.cands.unshift(mp); await persistCasting(); goCand(mp.id);
       toast('success', (mp.realName || c.name) + ' 又来了一趟，在选角页等着：签不签照常谈'); return;
     }
@@ -10329,7 +10351,8 @@ var PIANCHANG_ONLINE = (function () {
     var d = C.drawCands(1, st.dir.cast.map(function (x) { return (x.realName || '').charAt(0); }), others.map(function (x) { return x.portrait; }), null, [].concat.apply([], arr(st.dir.ncSeen))), p = d[0];
     if (d.keys && d.keys.length) save(function (s) { s.dir.ncSeen = arr(s.dir.ncSeen).concat([d.keys]).slice(-(C.NC_RECENT || 4)); });
     p.surname = na[0] || ''; p.given = na.slice(1).join(''); p.realName = nm; p.ddFrom = c.id; p.status = 'loading';
-    cur.cands.unshift(p); cur.busy = true; goCand(p.id);
+    if (deal) p.deal = deal;
+    cur.cands.unshift(p); cur.busy = true; if (deal) render(); else goCand(p.id);
     return genCandFrom(p, c, cur);
   }
   async function genCandFrom(p, c, mine) {
@@ -10346,7 +10369,34 @@ var PIANCHANG_ONLINE = (function () {
     if (r && r.male) { mine.cands = mine.cands.filter(function (x) { return x !== p; }); if (UI.hlCand === p.id) UI.hlCand = null; await persistCasting(); render(); toast('warning', '选角只招女优：' + p.realName + ' 是男的，约不来面试'); return; }
     if (r && r.ok) { fillCandFrom(p, r.data, st, mine); if (ev && ev.wb) p.recWb = 1; else delete p.recWb; } else { p.status = 'error'; p.err = err ? errMsg(err) : C.failText(C.sgFailKind(raw), r ? '缺：' + r.miss.join('、') : ''); }
     await persistCasting(); render();
-    if (p.status === 'ok') toast('success', p.realName + ' 来了，在选角页等着：签不签照常谈');
+    if (p.status === 'ok') { if (p.deal) dealToast(p); else toast('success', p.realName + ' 来了，在选角页等着：签不签照常谈'); }
+  }
+  // 正文里谈好了的：弹一条，点了直接开「签下 / 只拍一部」起艺名（签约金照常从账上走）
+  function dealToast(p) {
+    var msg = '正文里跟' + p.realName + '谈好了' + (p.deal === 'one' ? '只拍一部' : '签约') + '：点这条起个艺名，签下她';
+    try { if (typeof toastr !== 'undefined') toastr.success(msg, '声色片场', { timeOut: 30000, extendedTimeOut: 10000, closeButton: true, tapToDismiss: true, onclick: function () { openDeal(p.id); } }); } catch (e) {}
+    try { console.info('[声色片场] ' + msg); } catch (e) {}
+  }
+  function openDeal(id) {
+    var c = CUR && CUR.cands.find(function (x) { return x && x.id === id; }); if (!c || c.status !== 'ok') return;
+    UI.tab = 'casting'; lsSet(TAB_KEY, UI.tab); UI.hlCand = id; UI.modal = { kind: 'sign', id: id, one: c.deal === 'one' };
+    if (!PANEL.classList.contains('open')) openPanel(); else render();
+  }
+  // 正文这一楼的 [签约:名字|签约 / 一部]：擦掉；签着的不管；叮叮里有这个人就照她约，没有就照正文里的名字约（档案照正文 / 世界书写）
+  async function signFloor(mesId) {
+    try {
+      var ms = getChatMessages(mesId), m = ms && ms[0]; if (!m || m.role !== 'assistant') return;
+      var S = C.signScan(String(m.message || '')); if (!S.hits.length) return;
+      try { await setChatMessages([{ message_id: m.message_id, message: S.clean.replace(/\n{3,}/g, '\n\n').trimEnd() }], { refresh: 'affected' }); } catch (e) {}
+      var st = readState(); if (!dirLike(identity(st))) return;
+      for (var i = 0; i < S.hits.length; i++) {
+        var nm = S.hits[i].name, deal = S.hits[i].one ? 'one' : 'sign';
+        if (st.dir.cast.some(function (x) { return x && (x.stageName === nm || x.realName === nm); })) continue;
+        var dc = null; try { dc = DD && DD.contacts ? DD.contacts(st).find(function (x) { return x && !x.group && (x.name === nm || (x.ref && [x.ref.realName, x.ref.stageName].indexOf(nm) >= 0)); }) : null; } catch (e) {}
+        await castIn(dc || { id: 'n_' + nm, name: nm, kind: 'free' }, { deal: deal });
+        st = readState();
+      }
+    } catch (e) { try { console.warn('[声色片场] 签约暗号出错', e); } catch (e2) {} }
   }
   function fillCandFrom(p, d, st, mine) {
     p.gen = { want: d.want || '', skill: d.skill || '', stuck: d.stuck || '', intro: d.intro || '', answer: d.answer || '' };
@@ -11568,7 +11618,7 @@ var PIANCHANG_ONLINE = (function () {
       '<h3 class="pc-name"><span class="rb">NEWCOMER' + (ok ? ' · 本名' : '') + '</span>' + esc(ok || c.ddFrom ? c.realName : c.surname + ' ……') + '<small>' + c.age + ' 岁 · ' + esc(c.hometown) + '</small></h3>' +
       '<div class="pc-line">' + tierTag(c.tier) + (c.grade ? '<span class="tag' + (c.gradeKey === 'S' || c.gradeKey === 'SS' ? '' : ' gr') + '" data-pc-grade="' + esc(c.gradeKey) + '">' + esc(c.grade) + ' · ' + esc(c.gradeKey) + '</span>' : '') + '<span>' + esc(c.rankLabel) + ' · 一部 ' + esc(money(c.fee)) + ' · 签约金 ' + esc(money(c.signFee)) + '</span></div>' +
       (c.forScript ? '<div class="pc-line"><span class="tag gr" data-pc-for="' + esc(c.forScript.sid || '') + '">冲《' + esc(c.forScript.title) + '》来的</span>' + (c.firstTime ? '<span class="tag">第一次进棚</span>' : '') + '</div>' : '') +
-      (c.ddFrom ? '<div class="pc-line"><span class="tag gr" data-pc-dd="' + esc(c.ddFrom) + '">叮叮约来的</span>' + (c.recWb ? ' <span class="tag gr" data-pc-recwb>照世界书写的</span>' : '') + '</div>' : '');   // v0.1.28；v0.1.39 读到了她的世界书条目
+      (c.ddFrom ? '<div class="pc-line"><span class="tag gr" data-pc-dd="' + esc(c.ddFrom) + '">叮叮约来的</span>' + (c.recWb ? ' <span class="tag gr" data-pc-recwb>照世界书写的</span>' : '') + (c.deal ? ' <span class="tag" data-pc-deal>正文里谈好了' + (c.deal === 'one' ? '只拍一部' : '签约') + '</span>' : '') + '</div>' : '');   // v0.1.28；v0.1.39 读到了她的世界书条目
     if (c.status === 'loading') return '<article class="pc-tal' + (UI.hlCand && UI.hlCand === c.id ? ' hl' : '') + '" data-pc-card="cand" data-id="' + esc(c.id) + '">' + h + '<div class="busy" style="margin-top:12px">她在门口填表……</div></div></article>';
     // 卡面只放最有戏的六层（一项一行）；其余几层进「请她进来聊聊」的人设。v0.1.5 以前的候选人没有抽签池那几层，照旧显示本事 / 卡在哪
     h += profRows(c.pool >= 2 ? [['外形', c.look], ['入行前', c.past], ['为什么来', c.motive], ['心里话', g.want || c.need], ['卡在哪', c.stuck], ['面试那天', c.entrance], ['组里说她', C.gradeLine(c, true)], ['体质', c.phys], ['床上', c.react], ['说话', c.talk]]
@@ -12956,9 +13006,10 @@ var PIANCHANG_ONLINE = (function () {
   }
   function onTimeTag(mesId, type) {
     if (type === 'first_message' || type === 'impersonate' || type === 'quiet') return Promise.resolve();
-    _memoQ = _memoQ.then(doTime, doTime).then(doSec, doSec);   // 跟叮叮誊正文排同一条队：两边都改最新一楼；v0.1.40 暗线的暗号接在 [TIME] 后面
+    _memoQ = _memoQ.then(doTime, doTime).then(doSec, doSec).then(doSign, doSign);   // 跟叮叮誊正文排同一条队：两边都改最新一楼；v0.1.40 暗线的暗号接在 [TIME] 后面
     return _memoQ;
     function doSec() { return secFloor(mesId, type); }
+    function doSign() { return signFloor(mesId); }
     async function doTime() {
     try {
       var ms = getChatMessages(mesId); var m = ms && ms[0]; if (!m || m.role !== 'assistant') return;
@@ -13318,7 +13369,7 @@ var PIANCHANG_ONLINE = (function () {
         portraitOfName: function (nm) { var k = (L.npcPortrait || {})[String(nm || '')]; return k ? picUrl(k) : ''; }, addLedger: addLedger,
         faceOf: function (c) { return ddFace(c).u; }, faceFb: function (c) { return ddFace(c).fb; }, faceTap: function (c) { ddFaceTap(c); },   // 叮叮的头像（自己换的优先）、点聊天顶上的头像
         invAct: function (id, a) { if (a === 'go') return goInvite(id); return setInvStatus(id, a === 'accept' ? 'accepted' : 'ignored'); },
-        storyOnly: function (t) { return C.secStrip(C.walletStrip(String(t || '').replace(TIME_RE, '\n'))); },
+        storyOnly: function (t) { return C.signStrip(C.secStrip(C.walletStrip(String(t || '').replace(TIME_RE, '\n')))); },
         play: function () { return Promise.resolve(); }, ttsReady: function () { return false; }, voiceOf: function () { return ''; }, stopAudio: function () {},
         floorQ: function (fn) { _memoQ = _memoQ.then(fn, fn); return _memoQ; },
         secDd: function (id, s) { s = s || readState(); var c = id && arr(s.dir && s.dir.cast).find(function (x) { return x && x.id === id; }); return c && dirLike(identity(s)) ? C.secHint(c, s.day, { dd: true, low: nsfwLow() }) : ''; },   // v0.1.40 暗线：叮叮私聊她时的那一行
@@ -13546,7 +13597,7 @@ var PIANCHANG_ONLINE = (function () {
       coName: coName, submitCo: submitCo, takeLoan: takeLoan, payLoanMonth: payLoanMonth, bankerCheck: bankerCheck, castReqs: castReqs, startCasting: startCasting, repsFor: repsFor, takeInChat: takeInChat, profile: PF,
       faces: FX, faceUrl: faceUrl, imgKey: imgKey, openFace: openFace, os: OS,
       addLedger: addLedger, rb: { at: rbAt, slim: rbSlim, sync: rbSync, dirty: function () { return rbDirty(readState()); }, touch: function () { return TOUCH_AT; } },   // v0.1.28 楼层存档点
-      castInfo: castInfo, castIn: castIn, drawJob: drawJob, jobChance: jobChance, drawInvites: drawInvites, goInvite: goInvite, setInvStatus: setInvStatus };   // v0.1.28 约来面试、外包
+      castInfo: castInfo, castIn: castIn, openDeal: openDeal, drawJob: drawJob, jobChance: jobChance, drawInvites: drawInvites, goInvite: goInvite, setInvStatus: setInvStatus };   // v0.1.28 约来面试、外包
   } catch (e) {}
   console.info('[声色片场] 🎬 主脚本 v' + VERSION + ' 就位' + (identity() ? '（身份：' + identity() + '）' : '（还没选部门）'));
 })();
