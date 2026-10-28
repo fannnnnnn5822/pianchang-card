@@ -2352,6 +2352,7 @@ var PIANCHANG_CORE = (function () {
       '镜：机位，≤30字' + (pov ? '（以「第一视角：」开头）' : '') + '\n变：片场出的事（有片场意外才写）\n钩：引出下一场的一句，≤20字（最后一场写「完」）\n' +
       '【规矩】\n- 台词 ' + (multi ? '3–6' : '3–5') + ' 句，每句 ≤30 字，谁说的写在前面。句句是这一场正在拍的事：部位、动作、她的反应、下一步要做什么。' + (multi ? '在场的每个有名字的 NPC 至少一句（男优位·主是玩家的位子，可以没有）。' : '') + '\n' +
       '- 这一场的玩法和姿势都要拍到；换姿势的那一下写进台词或「要」。\n' +
+      '- 「导」只写开机、说戏、提醒机位这类话，不写喊卡叫停、NG、让她重来（拍的时候喊不喊卡由玩家定）。\n' +
       '- 写镜头拍得到的：手、嘴、腰、脸、物件、屏幕上的字。\n' +
       (ti >= 1 ? '- 喘只写一句，夹一个实词（「等、等一下……」）。\n' : '') +
       (pov ? '- 第一视角片：她看着镜头说话，叫「你」；他最多一句画外音，写成「他（画外）：」。\n' : '') +
@@ -2688,13 +2689,26 @@ var PIANCHANG_CORE = (function () {
     var f = (scn && scn.f) || {}, bed = (f['玩法'] && !/^无/.test(f['玩法'])) || f['姿势'];
     return '#' + d.n + ' ' + d.name + (bed ? '：' + (f['姿势'] ? softPose(f['姿势']) : '亲热戏') : '');
   }
+  // v0.1.44（zhengsigui：女优刚说几句就被导演、灯光喊卡，说台词不对，一直重来进不了正戏）：喊卡、NG 归玩家——
+  //   玩家自己喊卡，或者面板上点了「卡」（【刚才】里写着）才有；NPC 导演、灯光、摄影、场记不自己叫停、不挑台词。剧本里导演叫重来的那几句拍的时候不喂
+  //   Fan：「喊卡只能当情趣，不可以打断用户涩涩」——片场的人插话只能助兴，片场意外也不打断正在拍的亲热
+  var ONE_TAKE = '【一条拍到底】这一条从开机一直拍到这一场的「钩」，中间不停。喊卡、NG、重来只在两种时候写：{{user}} 自己喊了卡，或者【刚才】里写了喊卡。' +
+    '除此之外片场的人可以边拍边执导，但插话只能助兴、不能叫停：导演喊换姿势、给演员说戏、让摄影推近，都是机器开着、人不停的时候说；导演压着嗓子说「保持，别停」、灯光说「再贴近一点，光正好」、场记小声报时间，都行。导演、灯光、摄影、场记、柯大河都不喊卡、不叫停、不挑她的台词、不让她重来，更不打断正在拍的亲热。' +
+    '台词不用跟本子一字不差，意思到了就过，演员接着往下演。安全词「大头菜」另算：谁喊了都立刻停。';
+  var RETAKE_RE = /NG|重来|再来一[遍条次]|重拍|从头来|台词不对|台词错|念错|说错/;
+  function dropRetake(text) {
+    return String(text || '').split('\n').filter(function (l) {
+      var m = l.match(/^([^：「」]{1,10})：\s*[「“"『]/);
+      return !(m && /^(导|配|灯光|摄影|场记|柯大河)/.test(m[1]) && RETAKE_RE.test(l));
+    }).join('\n');
+  }
   function shootPrompt(sc, shoot, identity, opt) {
     var s = (sc.scenes || [])[shoot.cur], total = (sc.scenes || []).length, low = !!(opt && opt.low);
     if (!s) return '';
     var me = selfSeat(identity, shoot), nd = npcDir(shoot), boss = identity === '社长';
     var pov = me && !!shoot.pov;   // 自己上（第一视角）：男优位·主就是 {{user}}，照男优线标出来
     var scPov = isPovSc(sc), effPov = pov || (scPov && !(me && shoot.self === 'obj'));   // 这一部实际拍成第一视角没有
-    var body = ((identity === '男优' || me) ? markPlayer(s.text, shoot.seatCall) : s.text).replace(/^镜：主观(：?)/gm, function (m0, c) { return effPov ? '镜：第一视角' + c : '镜：'; });   // 老剧本的「镜：主观：…」
+    var body = dropRetake((identity === '男优' || me) ? markPlayer(s.text, shoot.seatCall) : s.text).replace(/^镜：主观(：?)/gm, function (m0, c) { return effPov ? '镜：第一视角' + c : '镜：'; });   // 老剧本的「镜：主观：…」
     var mis = shoot.mishap && shoot.mishap[s.n];
     var whoUser = boss ? '社长' : '导演', acts = dirActs(shoot);
     var first = pov ? (nd ? '{{user}} 是社长，这一部自己上：坐男优位·主，第一视角（自己拿机器）；导演是' + dirWho(shoot) + '。' : '{{user}} 是' + whoUser + '，这一部自己上：坐男优位·主，第一视角（自己拿机器）。')
@@ -2706,7 +2720,7 @@ var PIANCHANG_CORE = (function () {
     var a = [
       '【片场 · 正在拍】《' + sc.title + '》第 ' + (shoot.cur + 1) + '/' + total + ' 场。' + first,
       '这一轮正文只演下面这一场，演到这一场的「钩」就收住；后面的场还没开拍，不要提前演，也不要替后面的场铺垫。',
-      '剧本分两层：剧里的人物和设定照剧本演；片场的事实（谁演谁、NG、导演的话、机位、意外）也是真的，两层都写。',
+      '剧本分两层：剧里的人物和设定照剧本演；片场的事实（谁演谁、导演的话、机位、意外）也是真的，两层都写。',
       '【片头】', low ? softLines(headForShoot(sc, effPov)) : headForShoot(sc, effPov),
       castLine(sc, shoot, identity),
     ];
@@ -2739,6 +2753,7 @@ var PIANCHANG_CORE = (function () {
       a.push('【玩家的位子】{{user}} 是导演：「导」和「镜」是给他的提示，他会在消息里喊开机、喊卡、改机位、给演员说戏；演员和摄影照他的话走。男优位·主、二都是 NPC 男优，你来演。导演没喊卡之前，这一条照剧本往下拍。');
     }
     function obj0() { return '，喊开机、喊卡也是 {{user}}：柯大河掌机，{{user}} 自己在镜头里'; }
+    a.push(ONE_TAKE + (mis ? '【片场意外】那件事照写，但不打断正在拍的亲热：放在开拍前，或者演员顺着它接着演。' : ''));
     // 安全词「大头菜」和「一场最多三个有名字的人」在常开世界书【常开】片场规矩里，这里不重复
     if (shoot.note) a.push('【刚才】' + shoot.note);
     return a.join('\n');
@@ -9766,13 +9781,22 @@ var PIANCHANG_ONLINE = (function () {
   }
 
   // ── 日历上的邀约（纯代码，不花 token）──
-  var INV_CAP = 60;
+  var INV_CAP = 60, INV_AGAIN = 30;
+  // v0.1.44（亚伦：叮叮里戴晶「二号棚的灯坏了一盏」6/2 去过了，6/5 原话又来一遍）：以前每天从池子里随便抽，不看最近抽过什么。
+  //   现在去过的（答应了的）30 天内不再来；剩下的里头，最近来过的那几条（池子减 2 条那么多）也不抽，一条要等别的轮过才回来。排除光了那天就不来邀约
+  function invFresh(s, pool) {
+    var mine = arr(s.invites).filter(function (v) { return v && !v.job; }), went = {}, recent = {}, k = 0;
+    mine.forEach(function (v) { if ((v.status === 'went' || v.status === 'accepted') && Number(s.day) - Number(v.recvDay != null ? v.recvDay : v.day) < INV_AGAIN) went[v.text] = 1; });
+    var ok = pool.filter(function (t) { return !went[t.text]; }), w = Math.max(1, ok.length - 2);   // 至少隔一天：昨天来过的今天不来
+    for (var i = mine.length - 1; i >= 0 && k < w; i--) { var x = mine[i].text; if (!recent[x] && ok.some(function (t) { return t.text === x; })) { recent[x] = 1; k++; } }
+    return ok.filter(function (t) { return !recent[t.text]; });
+  }
   function drawInvites(s) {
     var id = identity(s); if (!id) return [];
     if (s.invDone >= s.day) return [];
     s.invDone = s.day;
     var hasFilm = arr(s.dir && s.dir.films).some(function (f) { return f && (f.status === 'released' || f.status === 'pulled'); });   // v0.1.42：方正那条要有上过架的片子
-    var pool = (L.invites || []).filter(function (t) { return (!t.face || String(t.face).split('|').indexOf(id) >= 0) && (t.need !== 'film' || hasFilm); }), out = [];
+    var pool = invFresh(s, (L.invites || []).filter(function (t) { return (!t.face || String(t.face).split('|').indexOf(id) >= 0) && (t.need !== 'film' || hasFilm); })), out = [];
     var n = C.rndFloat() < 0.55 ? 1 : (C.rndFloat() < 0.3 ? 2 : 0);
     C.drawN(pool, n).forEach(function (t) {
       var ahead = C.rndFloat() < 0.6 ? 0 : 1 + C.randInt(2);
