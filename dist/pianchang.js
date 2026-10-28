@@ -2359,7 +2359,7 @@ var PIANCHANG_CORE = (function () {
   function slotPoses(sl) { return (sl.pairs || []).filter(function (p) { return /^姿势/.test(p[0]); }).map(function (p) { return p[1]; }); }
   var STEP1_RETRY = '\n\n（上一次的格式没对上。这次请从「企划：」开始，片头几行，一行 ---，然后 #1 #2 … 每场几行：场名行、在场、玩法、姿势（有本番才写）、要。）';
   // v0.1.43：片头、分场都对，就「角色」一行认不出她和他
-  var STEP1_ROLE_RETRY = '\n\n（上一次「角色」那一行没照格式写，认不出谁是她、谁是他。这次别的照旧，「角色：」一行照【格式】写，每个人前面带「她＝」「他＝」：她＝名字（年龄，身份）；他＝名字（年龄，男优位·主，身份）。）';
+  var STEP1_ROLE_RETRY = '\n\n（上一次「角色」那一行没照格式写，认不出谁是她、谁是他。这次别的照旧，「角色：」一行照【格式】写，每个人前面带「她＝」「他＝」：她＝名字（年龄，身份）；他＝名字（年龄，男优位·主，身份）；两个她就写「她·称呼＝」，各叫各的。）';
   // 分场表一行：v3 写「#n 场名｜玩法」；旧剧本没有「玩法」就用「要」
   function sceneTableLine(s) { return '#' + s.n + ' ' + s.name + '｜' + clip(s.f['玩法'] || s.f['要'] || '', 40); }
   function sceneHeadBlock(s, multi) {
@@ -2578,6 +2578,14 @@ var PIANCHANG_CORE = (function () {
       out.push({ side: '他', call: '他', full: '男优', desc: '', seat: '主', seg: segs.length, guess: true });
       segs = segs.concat(['']); guess = true;
     }
+    // v0.1.47 两个人写成了同一个称呼（亚伦那份一男二女：「她＝林小雪（…）；她＝白石葵（…）」两个都叫「她」，选角第二格顶掉第一格——
+    //   片子里少一个人、同一个人的片酬扣两遍、借来的白桃拍完没回银星）：头一个照旧叫「她」，后面的改叫自己的名字（就是「她·白石葵＝」），角色一行顺手重写成这样
+    out.forEach(function (r, i) {
+      if (r.side === '配' || !out.slice(0, i).some(function (x) { return x.call === r.call; })) return;
+      var c0 = callOf(r.full), c = c0, k = 2;
+      while (out.some(function (x) { return x !== r && x.call === c; })) c = c0 + k++;
+      r.call = c; r.guess = true; guess = true;
+    });
     var hes = out.filter(function (r) { return r.side === '他'; });
     if (hes.length && !hes.some(function (r) { return r.seat === '主'; })) { var h0 = hes.find(function (r) { return r.seat !== '二'; }); if (h0) h0.seat = '主'; }
     hes.forEach(function (r) { if (!r.seat) r.seat = '二'; });
@@ -2612,7 +2620,7 @@ var PIANCHANG_CORE = (function () {
     function take(c, sd) {
       if (c.done || !sd || need[sd] <= 0) return;
       need[sd]--; c.done = got = true;
-      var call = n[sd === '她' ? 0 : 1] > 1 || out.some(function (r) { return r.call === sd; }) ? c.full : sd;
+      var call = n[sd === '她' ? 0 : 1] > 1 || out.some(function (r) { return r.call === sd; }) ? callOf(c.full) : sd;
       out.push({ side: sd, call: call, full: c.full, desc: c.desc, seat: sd === '他' ? c.seat : '', seg: c.seg, guess: true });
     }
     cs.forEach(function (c) { take(c, c.side); });
@@ -2620,6 +2628,8 @@ var PIANCHANG_CORE = (function () {
     cs.forEach(function (c) { if (!c.side && !c.lean) take(c, need['她'] > 0 ? '她' : '他'); });   // 看得出男女、那一边又满了的，多半是配角，不硬塞
     return got;
   }
+  // 拿名字当称呼（「她·称呼＝」那格）：去掉空格；「艾米莉亚·克拉克」这种取点前面那截；最多 6 个字（再长重新读的时候认不出来）
+  function callOf(full) { var c = String(full || '').replace(/\s+/g, ''); return (c.split(/[·・.]/)[0] || c).slice(0, 6) || '她'; }
   // 补认过的「角色」一行：认出来的那几段换成「她＝名字（…）」「他＝名字（年龄，男优位·主，…）」，其余原样留着
   function rolesLine(roles) {
     return '角色：' + (roles.segs || []).map(function (seg, i) {
@@ -9024,6 +9034,7 @@ var PIANCHANG_ONLINE = (function () {
     if (id) s[fkey].used = true;
     if (typeof s.money !== 'number' || !isFinite(s.money)) s.money = 0;
     if (!Array.isArray(s.ledger)) s.ledger = [];
+    if (!s.fix147) { s.fix147 = 1; feeBack(s); }
     if (s.scene && !s.scene.text) delete s.scene;
     if (DD) { try { DD.norm(s); } catch (e) {} }
     // 玩家自己换的头像 / 立绘（v0.1.8）：s.imgs[谁] = { av 头像, il 立绘 }，只存引用（idb:编号 或 图片链接），base64 一律不收
@@ -9036,6 +9047,25 @@ var PIANCHANG_ONLINE = (function () {
     if (PF) s.dir.cast.concat(s.dir.alumni).forEach(function (c) { if (c) pf('ensure', c, { day: s.day, films: s.dir.films, cast: s.dir.cast }); });
     if (dirLike(identity(s))) secFill(s);   // v0.1.40 暗线：正式签着、还没挂秘密的（老存档、导演开局四位、挖过来的）补一条，按 id 定种子，读几次都一样
     return s;
+  }
+  // v0.1.47（亚伦「扣了我两次钱」）：剧本里两个人写成了同一个称呼，开机时同一个人的片酬连着扣了两笔。一次开机的几笔片酬是挨着记的（前面隔着棚租、剧组），
+  //   挨着的这一串里同一句出现两遍就是多扣的（一个人本来演不了两个位子）——读档时退回来，只做一次（fix147）；收起来的另一个身份的钱包也看
+  function feeBack(s) {
+    [s].concat(Object.keys(obj(s.wallets)).map(function (k) { return s.wallets[k]; })).forEach(function (w) {
+      if (!w || !Array.isArray(w.ledger)) return;
+      var run = {}, back = [];
+      w.ledger.forEach(function (l) {
+        if (!l || l.kind !== 'fee' || !(Number(l.amount) < 0)) { run = {}; return; }
+        var k = l.day + '|' + l.amount + '|' + l.note;
+        if (run[k]) back.push(l); else run[k] = 1;
+      });
+      back.forEach(function (l) {
+        var amt = -Math.round(Number(l.amount));
+        w.money = Math.round((Number(w.money) || 0) + amt); s.lseq = (Number(s.lseq) || 0) + 1;
+        w.ledger.push({ day: s.day, kind: 'fee', amount: amt, note: '退回多扣的一笔：' + l.note + '（剧本里两个人写成了同一个称呼，同一个人扣了两遍）', q: s.lseq });
+      });
+      if (w.ledger.length > 200) w.ledger = w.ledger.slice(-200);
+    });
   }
   function readState() { return normState(clone(rawVar())); }
   var NPC_CAST = {}; (L.cast0 || []).forEach(function (c) { NPC_CAST[c.id] = 1; });
@@ -10649,6 +10679,8 @@ var PIANCHANG_ONLINE = (function () {
   function dirCheck(st, sc, cast, dirBy) {
     var why = [], warn = [], cost = E.studioRent + E.crew + (dirBy && dirBy !== 'self' ? (Number(E.dirFee) || 0) : 0);
     if (dirBy && dirBy !== 'self' && NPC_DIRS.indexOf(dirBy) < 0 && !dirCast(st).some(function (c) { return c.stageName === dirBy; })) why.push(dirBy + ' 不在公司里，导不了');
+    // v0.1.47（亚伦剪辑室里那部没有演员的《寒冷之镜》）：「角色」一行一个她都没认出来，选角一栏是空的——以前也能开机，拍出一部没人演的片
+    if (!C.rolesOk(sc)) why.push('「角色」那一行没认出谁是她、谁是他，开不了机：照选角上面的红字把那一行改好');
     rolesNeeding(sc).forEach(function (r) {
       var who = cast[r.call];
       if (!who) { why.push((r.side === '他' ? r.call + '（男优位·' + r.seat + '）' : r.call) + ' 还没选人'); return; }
@@ -10693,8 +10725,9 @@ var PIANCHANG_ONLINE = (function () {
       id: C.uid('k'), scriptId: rec.id, title: sc.title, tier: sc.tier, lineup: sc.lineup, cast: clone(UI.sh.cast), seatCall: selfCall, cur: 0, done: [], hook: '', status: '',
       mishap: {}, ng: 0, ngLog: [], paused: false, note: '', day: st.day, cost: chk.cost, total: sc.scenes.length, pov: selfKind === 'pov', self: selfKind, dirBy: dirBy, finishes: {},
     };
-    var m = startMishap(sc, sh);
+    var m = startMishap(sc, sh), twice = false;
     await save(function (s) {
+      if (s.dir.shoot) { twice = true; return; }   // 「开机」连点两下：第二下等第一下存完再看，已经在拍了就不再扣一遍钱
       s.dir.shoot = sh;
       var costs = [['studio', -E.studioRent, (boss ? '二号棚棚租（付给银星）' : '三号棚棚租') + '（《' + sc.title + '》）'], ['crew', -E.crew, '剧组：摄影、灯光、化妆、场务']];
       if (dirBy !== 'self') costs.push(['dirfee', -(Number(E.dirFee) || 0), '请' + dirBy + '来导《' + sc.title + '》']);
@@ -10709,6 +10742,7 @@ var PIANCHANG_ONLINE = (function () {
       addNews(s, '《' + sc.title + '》开机，女主' + Object.keys(sh.cast).filter(function (k) { return (sc.roles.find(function (r) { return r.call === k; }) || {}).side === '她'; }).map(function (k) { return sh.cast[k]; }).join('、') + (dirBy !== 'self' ? '，' + dirBy + '导' : ''));
       bankerCheck(s);
     });
+    if (twice) { render(); return; }
     applyShoot(); render();
     toast('success', '开机：《' + sc.title + '》第 1 场' + (sh.pov ? '（你自己上，第一视角）' : sh.self === 'obj' ? '（你自己上，镜头外拍，柯大河掌机）' : '') + (dirBy !== 'self' ? '，' + dirBy + '导' : '') + (m ? '。片场意外：' + m : '') + '。' + (dirBy !== 'self' ? '去正文吧，' + dirBy + '会喊开机' : '去正文喊「开机」吧') + '（场记板上能喊卡、下一场）');
     prefill(dirBy !== 'self' ? '（' + dirBy + '喊开机）' : '开机。'); closePanel();
@@ -10876,6 +10910,7 @@ var PIANCHANG_ONLINE = (function () {
     if ((fk === 'act' || selfIn(sh)) && last && last.bed && !(sh.finishes || {})[last.n]) { UI.modal = { kind: 'finish', n: last.n }; render(); return; }
     var out = [];
     await save(function (s) {
+      if (!s[fk].shoot || (sh.id && s[fk].shoot.id !== sh.id)) return;   // 「杀青」连点两下：第一下已经收了，第二下不再多进一部片
       if (fk === 'dir') {
         var over = Math.max(0, sh.ng - 3) * E.overtimePerNg;
         if (over) addLedger(s, 'overtime', -over, 'NG ' + sh.ng + ' 次，超时加班（便当和棚租）');
