@@ -2144,7 +2144,7 @@ var PIANCHANG_CORE = (function () {
   }
   function ideaBlock1(idea) {
     if (!idea) return '';
-    if (idea.draft) return '【玩家的草稿】（玩家自己写的，格式可能不全；这一部就照它拍）\n' + idea.draft + '\n【草稿怎么用】\n- 片名、人物、身份、地方、情节都照草稿。「角色」一行就是草稿里的人：身份、年龄、性格原样搬过来，换成格式就行；草稿没起名字的起个中文名。\n- 草稿里有场次的照草稿排，场名和场号可以理顺；草稿没写到的场你来补，补的场接着草稿的故事往下走。\n- 草稿里的台词，第二步写到那一场时原样用上。\n';
+    if (idea.draft) return '【玩家的草稿】（玩家自己写的，格式可能不全；这一部就照它拍）\n' + idea.draft + '\n【草稿怎么用】\n- 片名、人物、身份、地方、情节都照草稿。「角色」一行就是草稿里的人：身份、年龄、性格原样搬过来，写法照【格式】里那一行，每个人前面带「她＝」「他＝」（多人写「她·称呼＝」），草稿里的写法不照抄；草稿没起名字的起个中文名。\n- 草稿里有场次的照草稿排，场名和场号可以理顺；草稿没写到的场你来补，补的场接着草稿的故事往下走。\n- 草稿里的台词，第二步写到那一场时原样用上。\n';
     var a = [];
     if (idea.title) a.push('片名：《' + idea.title + '》（照用）');
     if (idea.pitch) a.push('卖点：' + idea.pitch + '（照这个意思写顺）');
@@ -2301,6 +2301,8 @@ var PIANCHANG_CORE = (function () {
   }
   function slotPoses(sl) { return (sl.pairs || []).filter(function (p) { return /^姿势/.test(p[0]); }).map(function (p) { return p[1]; }); }
   var STEP1_RETRY = '\n\n（上一次的格式没对上。这次请从「企划：」开始，片头几行，一行 ---，然后 #1 #2 … 每场几行：场名行、在场、玩法、姿势（有本番才写）、要。）';
+  // v0.1.43：片头、分场都对，就「角色」一行认不出她和他
+  var STEP1_ROLE_RETRY = '\n\n（上一次「角色」那一行没照格式写，认不出谁是她、谁是他。这次别的照旧，「角色：」一行照【格式】写，每个人前面带「她＝」「他＝」：她＝名字（年龄，身份）；他＝名字（年龄，男优位·主，身份）。）';
   // 分场表一行：v3 写「#n 场名｜玩法」；旧剧本没有「玩法」就用「要」
   function sceneTableLine(s) { return '#' + s.n + ' ' + s.name + '｜' + clip(s.f['玩法'] || s.f['要'] || '', 40); }
   function sceneHeadBlock(s, multi) {
@@ -2398,7 +2400,7 @@ var PIANCHANG_CORE = (function () {
   function parseScript(raw) {
     var t = cleanRaw(raw), lines = t.split('\n'), i0 = lines.findIndex(function (l) { return /^\s*企划\s*[：:]/.test(l.replace(/\*\*/g, '').replace(/^\s*#+\s*/, '')); });
     if (i0 < 0) return { ok: false, why: '没找到「企划：」那一行' };
-    var head = {}, headLines = [], scenes = [], cur = null, inHead = true;
+    var head = {}, headLines = [], scenes = [], cur = null, inHead = true, roleLoose = false;
     for (var i = i0; i < lines.length; i++) {
       var raw0 = lines[i], l = raw0.replace(/\*\*/g, '').trim();
       if (!l) continue;
@@ -2408,6 +2410,7 @@ var PIANCHANG_CORE = (function () {
       if (inHead) {
         var nl = normLine(l), k = keyOf(nl);
         if (k && HEAD_KEYS.indexOf(k) >= 0) { head[k] = (head[k] ? head[k] + '；' : '') + nl.slice(k.length + 1).trim(); headLines.push(nl); }
+        else if (ROLE_LINE_RE.test(nl)) { head['角色'] = (head['角色'] ? head['角色'] + '；' : '') + nl; roleLoose = true; }   // 角色另起几行、一行一个人
         else if (headLines.length && /^[　\s]/.test(raw0)) headLines[headLines.length - 1] += l;
         continue;
       }
@@ -2428,7 +2431,15 @@ var PIANCHANG_CORE = (function () {
     var tv = String(head['档位'] || '');
     var tier = /全年龄/.test(tv) ? '全年龄' : /R\s*15/i.test(tv) ? 'R15' : /BDSM|SM/i.test(tv) ? 'R18 BDSM' : /深渊/.test(tv) ? '深渊' : /R\s*18|常见|XP/i.test(tv) ? 'R18 常见XP' : '';
     var lineup = (String(head['阵容'] || '').match(/一男一女|一男两女|两男一女|一男三女/) || ['一男一女'])[0];
-    var res = { ok: true, title: title, tier: tier, lineup: lineup, head: head, headText: headLines.join('\n'), scenes: scenes, roles: parseRoles(head['角色'] || '') };
+    var roles = parseRoles(head['角色'] || '', lineup);
+    if ((roles.guess || roleLoose) && roles.length) {   // 补认出来的、另起行的：「角色」一行重写成规范写法，存回去以后就是好的
+      var rl = rolesLine(roles), at = headLines.findIndex(function (x) { return /^角色：/.test(x); });
+      headLines = headLines.filter(function (x, j) { return j === at || !/^角色：/.test(x); });
+      if (at < 0) { at = 0; headLines.forEach(function (x, j) { if (/^(企划|档位|阵容|分类|视角|长度|卖点|一句话)：/.test(x)) at = j + 1; }); headLines.splice(at, 0, rl); }
+      else headLines[headLines.findIndex(function (x) { return /^角色：/.test(x); })] = rl;
+      head['角色'] = rl.slice(3);
+    }
+    var res = { ok: true, title: title, tier: tier, lineup: lineup, head: head, headText: headLines.join('\n'), scenes: scenes, roles: roles };
     // 筛选用的三样（v3）：分类按「｜」切、照白名单过；视角只认第一视角（没写 / 老剧本写客观 = 普通片，pov 为空串）；长度没写按场数推（≤4 场算短篇）
     var wl = tagNames();
     res.tags = String(head['分类'] || '').split(/[｜|、,，\/]+/).map(function (x) { return tagFix(x.trim()); }).filter(function (x, i, a) { return x && a.indexOf(x) === i && (!wl.length || wl.indexOf(x) >= 0); });
@@ -2490,21 +2501,79 @@ var PIANCHANG_CORE = (function () {
     return out;
   }
   // 角色：她＝吴敏（34，…）；他＝韩冬（30，男优位·主，…）／她·美玲＝罗美玲（…）；他·志远＝谭志远（30，男优位·主，…）
-  function parseRoles(s) {
-    var out = [];
-    splitTop(s).forEach(function (seg) {
-      var m = seg.trim().match(/^(她|他|配)(?:[·・.](\S{1,6}?))?\s*[＝=]\s*([^（(]+)\s*(?:[（(](.*)[）)])?\s*$/);
-      // 手写剧本常见的写法「他·陆巡（35岁，男优位·主）」「他：陆巡」：没有＝，点或冒号后面直接是名字（v0.1.14，凌老师实测两男一女只认出一个她）
-      if (!m) { var m2 = seg.trim().match(/^(她|他|配)\s*[·・.:：]\s*([^（(＝=]+?)\s*(?:[（(](.*)[）)])?\s*$/); if (m2) m = [m2[0], m2[1], out.some(function (r) { return r.call === m2[1]; }) ? m2[2].trim() : '', m2[2], m2[3]]; }
-      if (!m) return;
+  function parseRoles(s, lineup) {
+    var out = [], loose = [], segs = splitTop(s).map(function (x) { return x.trim().replace(/[。．.！!]+$/, '').trim(); }).filter(Boolean);   // 整行末尾带句号的（亚伦那份：最后一个他就没认出来）
+    segs.forEach(function (seg, i) {
+      var m = seg.match(/^(她|他|配)(?:[·・.](\S{1,6}?))?\s*[＝=]\s*([^（(]+)\s*(?:[（(](.*)[）)])?\s*$/);
+      // 手写剧本常见的写法「他·陆巡（35岁，男优位·主）」「他：陆巡」「他 陆巡」：没有＝，点、冒号或空格后面直接是名字（v0.1.14，凌老师实测两男一女只认出一个她）
+      if (!m) { var m2 = seg.match(/^(她|他|配)(?:\s*[·・.:：]|\s)\s*([^（(＝=]+?)\s*(?:[（(](.*)[）)])?\s*$/); if (m2) m = [m2[0], m2[1], out.some(function (r) { return r.call === m2[1]; }) ? m2[2].trim() : '', m2[2], m2[3]]; }
+      // 「她（林晓，23岁，邻居）」：名字写进了括号第一格
+      if (!m) { var m3 = seg.match(/^(她|他)\s*[（(]\s*([^，,、（()）]{1,6}?)\s*[，,、]\s*(.*)[）)]\s*$/); if (m3) m = [m3[0], m3[1], out.some(function (r) { return r.call === m3[1]; }) ? m3[2] : '', m3[2], m3[3]]; }
+      if (!m) { loose.push(i); return; }
       var desc = (m[4] || '').trim();
-      out.push({ side: m[1], call: m[2] || m[1], full: m[3].trim(), desc: desc, seat: /男优位\s*[·・]?\s*二/.test(desc) ? '二' : (m[1] === '他' ? (/男优位\s*[·・]?\s*主/.test(desc) ? '主' : '') : '') });
+      out.push({ side: m[1], call: m[2] || m[1], full: m[3].trim(), desc: desc, seat: /男优位\s*[·・]?\s*二/.test(desc) ? '二' : (m[1] === '他' ? (/男优位\s*[·・]?\s*主/.test(desc) ? '主' : '') : ''), seg: i });
     });
+    var guess = roleGuess(out, segs, loose, lineup);
+    if (guess) out.sort(function (a, b) { return a.seg - b.seg; });
+    // 有她、一个他都没有（亚伦：只写了「她＝」也能存，拿去拍男优那一栏空白）：阵容里总有男的，补一个男优位·主，选角就有这一栏
+    if (out.some(function (r) { return r.side === '她'; }) && !out.some(function (r) { return r.side === '他'; })) {
+      out.push({ side: '他', call: '他', full: '男优', desc: '', seat: '主', seg: segs.length, guess: true });
+      segs = segs.concat(['']); guess = true;
+    }
     var hes = out.filter(function (r) { return r.side === '他'; });
     if (hes.length && !hes.some(function (r) { return r.seat === '主'; })) { var h0 = hes.find(function (r) { return r.seat !== '二'; }); if (h0) h0.seat = '主'; }
     hes.forEach(function (r) { if (!r.seat) r.seat = '二'; });
+    out.segs = segs; out.guess = guess;
     return out;
   }
+  // v0.1.43（亚伦：「从正文拿」的草稿交给编剧补全，「角色」一行照正文抄成「林晓（23岁，邻居）；陈诚（28岁，书卷气）」，拿去拍时选角一栏空白）：
+  //   阵容里的她、他没认齐，才去认那几段没写「她＝」「他＝」的。先看写明了的：「女主：」「男二＝」这类开头、括号里的男优位、单独一格「男」「女」；
+  //   再看括号里的人妻、丈夫这类字眼；都看不出来的按顺序先补她、再补他。认齐了还多出来的照旧不认（多半是配角）
+  var ROLE_LABEL = /^(女|男)(?:主角?|优|配角?|角|[一二三]号?)?\s*(?:[＝=：:·・]\s*|\s+)/;
+  var ROLE_LINE_RE = /^(?:她|他|配|[女男](?:主角?|优|配角?|[一二三]号?))(?:[·・.][^\s＝=：:]{1,6})?\s*[＝=：:](?!\s*[「“"『])/;
+  var ROLE_F = /妻|新娘|太太|夫人|姐姐|妹妹|学姐|学妹|少女|女孩|女生|女友|女儿|女仆|老板娘|阿姨|嫂|母亲|妈妈|女士|小姐|少妇|寡妇/;
+  var ROLE_M = /丈夫|老公|先生|男友|男生|大叔|哥哥|弟弟|父亲|爸爸|少爷|男人|小伙/;
+  function roleGuess(out, segs, loose, lineup) {
+    var n = LINEUP_N[lineup] || LINEUP_N['一男一女'];
+    var need = { '她': n[0], '他': n[1] };
+    out.forEach(function (r) { if (need[r.side] != null) need[r.side]--; });
+    if (!loose.length || (need['她'] <= 0 && need['他'] <= 0)) return false;
+    var cs = loose.map(function (i) {
+      var t = segs[i], side = '', seat = '', lm = t.match(ROLE_LABEL);
+      if (lm) { side = lm[1] === '女' ? '她' : '他'; if (side === '他' && /二/.test(lm[0])) seat = '二'; t = t.slice(lm[0].length); }
+      var nm = t.match(/^([^（(＝=：:，,；;]{1,8}?)\s*(?:[（(](.*)[）)])?\s*$/) || t.match(/^([^（(＝=：:，,\s]{1,6})\s*[，,]\s*(.+)$/);
+      if (!nm) return null;
+      var desc = String(nm[2] || '').trim(), its = desc.split(/[，,、]/).map(function (x) { return x.trim(); });
+      if (!side && /男优位|第一视角/.test(desc)) side = '他';   // 第一视角就是男优位·主那双眼睛（亚伦那份：君不见（28岁，丈夫·第一视角…））
+      if (!side && its.some(function (x) { return /^男性?$/.test(x); })) side = '他';
+      if (!side && its.some(function (x) { return /^女性?$/.test(x); })) side = '她';
+      var lean = !side && ROLE_F.test(desc) !== ROLE_M.test(desc) ? (ROLE_F.test(desc) ? '她' : '他') : '';
+      return { seg: i, side: side, lean: lean, seat: /男优位\s*[·・]?\s*二/.test(desc) ? '二' : seat, full: nm[1].trim(), desc: desc };
+    }).filter(Boolean);
+    var got = false;
+    function take(c, sd) {
+      if (c.done || !sd || need[sd] <= 0) return;
+      need[sd]--; c.done = got = true;
+      var call = n[sd === '她' ? 0 : 1] > 1 || out.some(function (r) { return r.call === sd; }) ? c.full : sd;
+      out.push({ side: sd, call: call, full: c.full, desc: c.desc, seat: sd === '他' ? c.seat : '', seg: c.seg, guess: true });
+    }
+    cs.forEach(function (c) { take(c, c.side); });
+    cs.forEach(function (c) { if (!c.side) take(c, c.lean); });
+    cs.forEach(function (c) { if (!c.side && !c.lean) take(c, need['她'] > 0 ? '她' : '他'); });   // 看得出男女、那一边又满了的，多半是配角，不硬塞
+    return got;
+  }
+  // 补认过的「角色」一行：认出来的那几段换成「她＝名字（…）」「他＝名字（年龄，男优位·主，…）」，其余原样留着
+  function rolesLine(roles) {
+    return '角色：' + (roles.segs || []).map(function (seg, i) {
+      var r = roles.find(function (x) { return x.seg === i; });
+      if (!r || !r.guess) return seg;
+      var desc = r.desc;
+      if (r.side === '他' && !/男优位/.test(desc)) { var its = desc ? desc.split(/[，,]/) : []; its.splice(its.length && /\d/.test(its[0]) ? 1 : 0, 0, '男优位·' + r.seat); desc = its.join('，'); }
+      return r.side + (r.call !== r.side ? '·' + r.call : '') + '＝' + r.full + (desc ? '（' + desc + '）' : '');
+    }).join('；');
+  }
+  // 拿去拍要的：至少一个她、一个他（阵容里都有男的）
+  function rolesOk(sc) { var rs = (sc && sc.roles) || []; return rs.some(function (r) { return r.side === '她'; }) && rs.some(function (r) { return r.side === '他'; }); }
   // 第二步写回来的一场 → 并进剧本。只截「#n」那一行到下一个「#数字」之间：模型前面的客套话、顺手多写的下一场都不要
   function parseScene(raw, n) {
     var rows = cleanRaw(raw).split('\n'), start = -1, end = rows.length;
@@ -3462,7 +3531,7 @@ var PIANCHANG_CORE = (function () {
     poolOf: poolOf, drawSlots: drawSlots, isTokuPlan: isTokuPlan, isTokuSc: isTokuSc, setTokuWork: setTokuWork, TOKU_TAG: TOKU_TAG, TOKU_ANY: TOKU_ANY, slotBraces: slotBraces, slotGet: slotGet, rollMishap: rollMishap, afterMishaps: afterMishaps, LINEUPS: LINEUPS, sceneCount: sceneCount,
     poseFamily: poseFamily, POSE_CAM: POSE_CAM, poseCamLines: poseCamLines, scenePoses: scenePoses, drawPoses: drawPoses, tagNames: tagNames, fixTags: fixTags, isPovSc: isPovSc, POV: POV, povOf: povOf, tagFix: tagFix, headForShoot: headForShoot, ncKey: ncKey, NC_RECENT: NC_RECENT,
     STYLE_JA: STYLE_JA, STYLE_JA_POV: STYLE_JA_POV, MULTI_RULES: MULTI_RULES, scFilterOk: scFilterOk, scFilterOn: scFilterOn, scFilterBar: scFilterBar, scFilterClick: scFilterClick,
-    buildStep1: buildStep1, buildStep2: buildStep2, STEP1_RETRY: STEP1_RETRY, STEP2_RETRY: STEP2_RETRY,
+    buildStep1: buildStep1, buildStep2: buildStep2, STEP1_RETRY: STEP1_RETRY, STEP1_ROLE_RETRY: STEP1_ROLE_RETRY, rolesOk: rolesOk, rolesLine: rolesLine, STEP2_RETRY: STEP2_RETRY,
     parseScript: parseScript, parseScene: parseScene, mergeScene: mergeScene, scriptSane: scriptSane, pickMishapScene: pickMishapScene, parseRoles: parseRoles, scriptAllText: scriptAllText, makeIdea: makeIdea, ideaEmpty: ideaEmpty, ideaText: ideaText, ideaLineup: ideaLineup, draftLineup: draftLineup, draftPov: draftPov, floorDraft: floorDraft, walletScan: walletScan, walletStrip: walletStrip, applyRec: applyRec, candFromMore: candFromMore, SECRETS: SECRETS, SEC_ID: SEC_ID, SEC_KIND: SEC_KIND, SEC_CAST0: SEC_CAST0, SEC_N2: SEC_N2, SEC_GEN_RETRY: SEC_GEN_RETRY, pickSecret: pickSecret, newSec: newSec, secEntry: secEntry, secStage: secStage, secHint: secHint, secKw: secKw, secScan: secScan, secStrip: secStrip, secText: secText, secRng: secRng, buildSecGen: buildSecGen, parseSecGen: parseSecGen, signScan: signScan, signStrip: signStrip,ideaTier: ideaTier, applyIdea: applyIdea, ideaUnused: ideaUnused, markIdea: markIdea, lineCore: lineCore, cleanRaw: cleanRaw, sgFailKind: sgFailKind, failText: failText,
     markPlayer: markPlayer, castLine: castLine, shootPrompt: shootPrompt, softPose: softPose, softLines: softLines, doneLine: doneLine, statusPrompt: statusPrompt, parseStatus: parseStatus,
     PORTRAIT_N: PORTRAIT_N, PORTRAIT_BASE: PORTRAIT_BASE, portraitOk: portraitOk, portraitUrl: portraitUrl, pickPortrait: pickPortrait, fillPortraits: fillPortraits,
@@ -10136,16 +10205,19 @@ var PIANCHANG_ONLINE = (function () {
   var GEN = { busy: false, label: '', step: '', err: '', sid: '' };   // 正在写的那份剧本（同一时间只写一份）
   var EPOCH = 0;   // 切一次聊天 +1：await 回来发现变了，就不往（已经换掉的）聊天里写
   // 第一步：片头 + 分场表。返回剧本记录（raw 先只有分场表）
+  // v0.1.43（亚伦）：认得出剧本、「角色」一行补认了还是没有她或他，再要一次；第二次还这样就先存下这份（台词照写），写完提醒玩家去改那一行
   async function writeStep1(sl) {
-    var p = C.buildStep1(sl), last = '';
+    var p = C.buildStep1(sl), last = '', keep = null;
     for (var attempt = 0; attempt < 2; attempt++) {
       var raw;
-      try { raw = await genAsk(p, attempt ? C.STEP1_RETRY : '', 'pianchang-s1-' + Date.now().toString(36) + attempt); }
+      try { raw = await genAsk(p, attempt ? (keep ? C.STEP1_ROLE_RETRY : C.STEP1_RETRY) : '', 'pianchang-s1-' + Date.now().toString(36) + attempt); }
       catch (e) { last = errMsg(e); if (is429(e)) break; continue; }
       var r = C.parseScript(raw);
-      if (r.ok) return { raw: C.cleanRaw(raw).slice(C.cleanRaw(raw).search(/企划\s*[：:]/)), parsed: r };
+      if (r.ok && C.rolesOk(r)) return { parsed: r };
+      if (r.ok) { keep = keep || { parsed: r, rolesBad: true }; continue; }
       last = C.failText(C.sgFailKind(raw), r.why);
     }
+    if (keep) return keep;
     throw new Error(last || '没写出来');
   }
   // 第二步：一场一场写。sc 是解析好的剧本；返回写成功的场数
@@ -10191,6 +10263,7 @@ var PIANCHANG_ONLINE = (function () {
         await save(function (s) { var x = s[face].scripts.find(function (y) { return y.id === rec.id; }); if (x) x.raw = raw2; });
       }
       toast('success', '剧本写好了：《' + sc.title + '》');
+      if (s1.rolesBad) { GEN.err = '《' + sc.title + '》' + ROLES_FIX; toast('warning', GEN.err); }
     } catch (e) { if (ep !== EPOCH) return null; GEN.err = errMsg(e); toast('error', '剧本没写成：' + GEN.err); }
     GEN.busy = false; GEN.step = ''; render();
     return rec;
@@ -10819,6 +10892,9 @@ var PIANCHANG_ONLINE = (function () {
 
   // ═════════════════════════ 自己写剧本 ═════════════════════════
   // 自己写的、改过的剧本存之前过一遍：认不出来、没有「她」、没有档位就不存
+  // v0.1.43（亚伦）：「角色」一行认不出她和他，拿去拍时选角那一栏是空的。卡片上、开机前的选角上都挂这一句
+  var ROLES_FIX = '「角色」那一行没认出谁是她、谁是他，拿去拍时选角会空：点「编辑」，把那一行照这样改——她＝名字（年龄，身份）；他＝名字（年龄，男优位·主，身份）';
+  function rolesHint(rec) { return scEditable(rec) ? ROLES_FIX : '「角色」那一行没认出谁是她、谁是他，拿去拍时选角会空。'; }
   function customErr(r) {
     if (!r.ok) return '没认出来：' + r.why + '。格式照剧本库那几部：企划/档位/卖点/角色……一行 ---，然后 #1 场名｜地点、在场、情、新、要。';
     if (!r.roles.some(function (x) { return x.side === '她'; })) return '「角色」一行里至少要有一个「她＝名字（年龄，身份）」：开机选角、片酬都看这一行。';
@@ -11834,7 +11910,7 @@ var PIANCHANG_ONLINE = (function () {
     var src = rec.source === 'buy' ? '<span class="tag gr">买来的' + (rec.from ? ' · ' + esc(rec.from) : '') + '</span>' : rec.source === 'official' ? '<span class="tag gr">官方剧本</span>' : '';
     return '<div class="card" data-pc-card="script" data-id="' + esc(rec.id) + '" data-source="' + esc(rec.source || '') + '"><div class="row">' + tierTag(sc.tier) + '<b style="font-size:16px">《' + esc(sc.title) + '》</b>' + src + '</div>' +
       '<div class="faint" style="margin:4px 0">' + esc(sc.lineup) + ' · ' + sc.scenes.length + ' 场' + (full < sc.scenes.length ? ' · 台词写了 ' + full + ' 场' : '') + (rec.onlyActor ? ' · <span class="err">男优身份限定</span>' : '') + '</div>' + scMetaHtml(sc) +
-      '<div class="sub">' + esc(sc.head['卖点'] || '') + '</div>' +
+      '<div class="sub">' + esc(sc.head['卖点'] || '') + '</div>' + (rec.onlyActor || C.rolesOk(sc) ? '' : '<div class="err" data-pc-roles style="margin-top:4px">' + esc(rolesHint(rec)) + '</div>') +
       '<div class="row" style="margin-top:8px"><button class="btn sm" data-act="sc-view" data-id="' + rec.id + '">看剧本</button><button class="btn sm" data-act="sc-post" data-id="' + rec.id + '" title="写进正文最新一楼，折叠着">📄 发剧本</button>' +
       (dirFace && !rec.onlyActor ? '<button class="btn sm pri" data-act="sc-shoot" data-id="' + rec.id + '">拿去拍</button><button class="btn sm" data-act="sc-take" data-id="' + rec.id + '">试戏</button>' : '') +
       (rec.source !== 'lib' && full < sc.scenes.length ? '<button class="btn sm" data-act="sc-fill" data-id="' + rec.id + '">补写台词</button>' : '') +
@@ -11992,7 +12068,7 @@ var PIANCHANG_ONLINE = (function () {
         dcs.map(function (c) { return '<option value="' + esc(c.stageName) + '"' + (dv === c.stageName ? ' selected' : '') + '>让' + esc(c.stageName) + '来导（' + esc(fee) + '；她也能同时演）</option>'; }).join('') + '</select>';
       if (dcs.some(function (c) { return c.stageName === dv; }) && Object.keys(UI.sh.cast).some(function (k) { return UI.sh.cast[k] === dv; })) h += '<div class="faint" data-pc-selfdir style="margin-top:4px">🎬 ' + esc(dv) + '自导自演：她在镜头里演，也喊开机、喊卡，柯大河掌机，一条拍完去监视器回看。片酬和导演费都付。</div>';
     }
-    h += '<div class="lbl">选角</div>';
+    h += '<div class="lbl">选角</div>' + (C.rolesOk(sc) ? '' : '<div class="err" data-pc-roles style="margin-bottom:6px">' + esc(rolesHint(rec)) + '</div>');
     var bySc = forScriptCast(st, rec && rec.id);
     rolesNeeding(sc).forEach(function (r) {
       var opts = r.side === '她' ? st.dir.cast.map(function (c) { var l = C.daysToShoot(c, st.day), okT = C.tierOk(c.tier, sc.tier); return '<option value="' + esc(c.stageName) + '"' + (UI.sh.cast[r.call] === c.stageName ? ' selected' : '') + '>' + esc(c.stageName) + '（' + esc(C.tierShort(c.tier)) + (okT ? '' : '，尺度不够') + (l ? '，还差 ' + l + ' 天' : '') + (bySc[r.call] === c.stageName ? '，冲这部来的' : '') + '）</option>'; })
