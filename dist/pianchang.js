@@ -888,6 +888,22 @@ var PIANCHANG_CORE = (function () {
   }
   // v0.1.29：草稿是不是第一视角片。只认「第一视角 / 第一人称 / POV / 视角：主观」；「主观镜头」是普通片里的一种机位，不算
   function draftPov(t) { return /第一视角|第一人称|POV|视角\s*[：:]\s*主观/i.test(String(t || '')); }
+  // v0.1.39（10091009mc、crazyman2333「正文赚的钱和脚本赚的钱对不上」，照一掷千金的 [WALLET]）：正文里 {{user}} 自己的钱有进出，模型在楼尾写 [WALLET:+¥金额:事由]，主脚本记进面板的账
+  //   写法放宽照一掷千金：¥ / ￥ / 元 / 块、万 / 千 / w / k、千位逗号、全角冒号和括号、事由可省；正负号也认全角和数学减号，没写正负号当进账
+  var WALLET_SRC = '[\\[［【]\\s*(?:WALLET|钱包|记账)\\s*[:：]\\s*([+\\-−－＋]?)\\s*(?:\\$|¥|￥|RMB|rmb)?\\s*(\\d[\\d,，]*(?:\\.\\d+)?)\\s*(万|萬|千|[wWkK])?\\s*(?:元|块|圆|RMB|rmb)?\\s*(?:[:：|｜]\\s*([^\\]］】\\n]*))?[\\]］】]';
+  function walletStrip(t) { return String(t == null ? '' : t).replace(new RegExp('\\n?[ \\t]*' + WALLET_SRC + '[ \\t]*', 'gi'), ''); }
+  // → { ops: [{ amount（正进负出）, note }], hits: 认出来几个标签（金额是 0 的也算，照样擦掉）, clean: 擦掉标签的正文 }
+  function walletScan(raw) {
+    var t = String(raw == null ? '' : raw), re = new RegExp(WALLET_SRC, 'gi'), ops = [], hits = 0, m;
+    while ((m = re.exec(t))) {
+      hits++;
+      var n = parseFloat(String(m[2]).replace(/[,，]/g, '')) || 0, u = m[3] || '';
+      n = Math.round(n * (/[万萬wW]/.test(u) ? 10000 : /[千kK]/.test(u) ? 1000 : 1));
+      if (!n || n > 1e10) continue;
+      ops.push({ amount: /[-−－]/.test(m[1]) ? -n : n, note: clip(String(m[4] || '').trim(), 30) });
+    }
+    return { ops: ops, hits: hits, clean: hits ? walletStrip(t) : t };
+  }
   // v0.1.30（亚伦：在正文里跟 AI 聊剧本有活人感）：「自己写」的「从正文拿」，把一楼 AI 正文洗成草稿。照 skill 06 副轨第 8 条 + 小狸 Live 的 stripProse：
   //   整块删：注释（<!--叮叮-->）、style / script、思维容器、我们自己写进楼里的 📄 剧本块 / 叮叮折叠块 / ```chat 誊本、[TIME]
   //   只脱壳留内容：别的 ``` 围栏（企划案常被模型包在代码块里）、其余标签（<content> 里装的就是正文；不跨行，免得吞掉两个尖括号之间的字）
@@ -895,10 +911,10 @@ var PIANCHANG_CORE = (function () {
   //   洗完一个字不剩（整楼包在思维容器里的预设）就退回温和洗：思维容器只脱壳
   var FLOOR_THINK = 'think|thinking|thought|reasoning|cot|analysis|scratchpad';
   function floorDraft(raw) {
-    var base = String(raw == null ? '' : raw).replace(/\r/g, '')
+    var base = walletStrip(String(raw == null ? '' : raw).replace(/\r/g, '')
       .replace(/<style[\s\S]*?<\/style>/gi, '').replace(/<script[\s\S]*?<\/script>/gi, '').replace(/<!--[\s\S]*?-->/g, '')
       .replace(/<details data-pc(?:script|ddlog)[\s\S]*?<\/details>/g, '').replace(/```chat\n[\s\S]*?\n```/g, '')
-      .replace(/\[TIME\s*[:：][^\]\n]*\]/gi, '');
+      .replace(/\[TIME\s*[:：][^\]\n]*\]/gi, ''));
     function tidy(t) { return t.replace(/```[a-z]*\n?/gi, '').replace(/<[^>\n]{1,300}>/g, '').replace(/[ \t]+$/gm, '').replace(/\n{3,}/g, '\n\n').trim(); }
     var strict = base.replace(new RegExp('<(' + FLOOR_THINK + ')(?:\\s[^>]*)?>[\\s\\S]*?<\\/\\1\\s*>', 'gi'), '');
     var lone = strict.match(new RegExp('<\\/(?:' + FLOOR_THINK + ')\\s*>', 'i')); if (lone) strict = strict.slice(lone.index + lone[0].length);   // 开头那半截在预填里
@@ -1821,7 +1837,7 @@ var PIANCHANG_CORE = (function () {
   }
   function parseCands(raw, cs) { var parts = splitBatch(raw, cs.length); return cs.map(function (c, i) { return parseCandOne(parts[i], c.surname); }); }
   // ── 约来面试（v0.1.28，crazyman2333「加好友的女优能不能约来面试」）：叮叮里的人，名字定了；正文 / 叮叮 / 世界书里关于她的记录跟格子一起给 ──
-  //   跟记录对不上的格子照记录改：只放开年龄、外形、入行前、为什么来四格（XP、NG、尺度、特质照格子）；性别照记录，写了「男」脚本就不约
+  //   跟记录对不上的格子照记录改：年龄、外形、入行前、为什么来；有记录的人再加经验、组里说她、说话、体质、床上、XP、NG（v0.1.39，见 candFromMore）；尺度、特质照格子；性别照记录，写了「男」脚本就不约
   //   o：{ studio: 片商名, who: 玩家称呼（社长 / 导演） }；ev：{ story, chat, wb }（dingding.castEvidence）
   var CAND_FROM_FMT = '性别|女 或 男（照记录写；记录里这个人是男的就写男，下面几行可以空着）\n年龄|数字（记录里写过就照记录，没写照格子）\n外形|一句（记录里写过长相就照记录，没写照格子）\n入行前|一句（记录里写过她做什么就照记录，没写照格子）\n为什么来|一句（她为什么肯来面试：接着记录里她和{U}的来往写）\n人话|一句话，30 字以内：她缺什么、想要什么\n自我介绍|两三句，她自己的口吻\n面试|{U}问「为什么来」，她答的一句\n';
   var CAND_FROM_RETRY = '\n\n（上一次的格式没对上。这次每行一项，分别以 性别| 年龄| 外形| 入行前| 为什么来| 人话| 自我介绍| 面试| 开头。）';
@@ -1835,22 +1851,61 @@ var PIANCHANG_CORE = (function () {
     if (ev.wb) rec.push('【世界书里她的条目】\n' + ev.wb);
     var user = '【她的名字】' + c.realName + '（定了，照这个写）\n【抽到的档案格子】\n' + candLines(c, !!o.low).slice(1).join('\n') + '\n\n' +
       (rec.length ? rec.join('\n\n') : '（正文和叮叮里关于她的记录很少：照格子写，名字照上面的。）') + '\n\n' +
-      '【请按这个格式回：每行一项，行首写项目名，用竖线隔开】\n' + CAND_FROM_FMT.replace(/\{U\}/g, U) + '\n' + CAND_RULES.replace(/- 档案里写着她是看了哪份招聘来的[^\n]*\n/, '') + '\n只输出这几行。';
+      '【请按这个格式回：每行一项，行首写项目名，用竖线隔开】\n' + CAND_FROM_FMT.replace(/\{U\}/g, U) + (rec.length ? candFromMore(c, !!o.low) : '') + '\n' + CAND_RULES.replace(/- 档案里写着她是看了哪份招聘来的[^\n]*\n/, '') + '\n只输出这几行。';
     return { sys: sys, user: user };
   }
-  var FROM_KEY = { '性别': 'sex', '年龄': 'age', '外形': 'look', '入行前': 'past', '为什么来': 'motive', '人话': 'want', '本事': 'skill', '卡在哪': 'stuck', '自我介绍': 'intro', '面试': 'answer' };
-  var FROM_SKIP = /^[（(]?\s*(照格子|同格子|跟格子一样|不变|没写|无|空|—+|-+)\s*[）)]?$/;
+  // v0.1.39（crazyman2333：女优世界书里写着在大厂拍过不少片，约来面试却抽到「耗材王 · 全组干等她进状态」）：照一掷千金立档那套「归纳，不是发明」——
+  //   有记录的人，经验、组里说她、体质、床上、说话、XP、NG 也照记录写（记录没提的写「照格子」，留着抽到的）。没记录的照旧全照格子
+  //   低档 / 全年龄的人不问体质、床上、XP、NG（低档本来就不发这几格；全年龄的人没抽这几层）
+  function candFromMore(c, low) {
+    var adult = !low && tierIdx(c.tier) >= 1, sk = '没写就写「照格子」';
+    return '经验|记录里写过她拍过多少、红不红，就从这几档里挑一个照抄：' + (L.rank || []).map(function (r) { return r.label; }).join(' / ') + '；' + sk + '\n' +
+      (c.grade ? '组里说她|记录里看得出她在片场好不好拍，就从这几档里挑一个照抄：' + (FG.grade || []).map(function (g) { return g.name + '（' + g.t + '）'; }).join(' / ') + '；' + sk + '\n' : '') +
+      '说话|记录里写过她说话的样子，照记录写一句；' + sk + '\n' +
+      (adult ? '体质|记录里写过她身体上特别的地方，照记录写一句；' + sk + '\nXP|记录里写过她喜欢什么，照记录写，用；隔开；' + sk + '\nNG|记录里写过她不拍什么，照记录写，用；隔开；' + sk + '\n' : '') +
+      (adult && c.react ? '床上|记录里写过她床上什么样，照记录写一句；' + sk + '\n' : '');
+  }
+  // 照记录改格子（pianchang.fillCandFrom 调）：经验改了片酬、签约金跟着换；体质 / 床上换了，档案钩子照剩下的格子重算。返回改了哪几格
+  function applyRec(p, d) {
+    var got = [], ti = tierIdx(p.tier);
+    if (d.rank) { var r = (L.rank || []).find(function (x) { return d.rank.indexOf(x.label) >= 0; }); if (r && r.rank !== p.rank) { p.rank = r.rank; p.rankLabel = r.label; p.fee = filmFee(p.rank, p.tier); p.signFee = Number((E.signFee || [])[p.rank]) || 0; got.push('rank'); } }
+    if (d.grade && p.grade) { var g = (FG.grade || []).find(function (x) { return d.grade.indexOf(x.name) >= 0; }); if (g && g.g !== p.gradeKey) { p.grade = g.name; p.gradeKey = g.g; p.gradeText = g.t; got.push('grade'); } }
+    ['phys', 'react', 'talk'].forEach(function (k) {
+      if (!d[k] || (k !== 'talk' && ti < 1)) return;
+      p[k] = clip(d[k], 40); p.fgT = p.fgT || {}; p.fgT[k] = k === 'talk' ? (NC_ADULT && NC_ADULT.test(p[k]) ? Math.max(1, ti) : 0) : ti; got.push(k);
+    });
+    if (got.indexOf('phys') >= 0 || got.indexOf('react') >= 0) refx(p);
+    ['xp', 'ng'].forEach(function (k) {
+      if (!d[k] || ti < 1) return;
+      var a = d[k].split(/[；;、，,\/]+/).map(function (x) { return clip(x.trim(), 20); }).filter(Boolean).slice(0, 3);
+      if (a.length) { p[k] = a; got.push(k); }
+    });
+    if (got.length) p.rec = got;
+    return got;
+  }
+  // 档案钩子（c.fx）照她身上还留着的抽签格子重算：照记录换掉的那格，钩子跟着没了
+  function refx(p) {
+    var fx = {};
+    [['phys', FG.phys], ['sense', FG.sense], ['react', FG.react], ['talk', FG.talk], ['sig', FG.sig]].forEach(function (pr) {
+      var it = (pr[1] || []).find(function (x) { return x && x[0] === p[pr[0]]; });
+      if (it && it[3]) Object.keys(it[3]).forEach(function (h) { if (fx[h] == null) fx[h] = it[3][h]; });
+    });
+    if (Object.keys(fx).length) p.fx = fx; else delete p.fx;
+  }
+  var FROM_KEY = { '性别': 'sex', '年龄': 'age', '外形': 'look', '入行前': 'past', '为什么来': 'motive', '人话': 'want', '本事': 'skill', '卡在哪': 'stuck', '自我介绍': 'intro', '面试': 'answer',
+    '经验': 'rank', '组里说她': 'grade', '说话': 'talk', '体质': 'phys', '床上': 'react', 'XP': 'xp', 'NG': 'ng' };
+  var FROM_SKIP = /^[（(]?\s*(照格子|同格子|跟格子一样|不变|没写|无|空|—+|-+)\s*[）)]?[。.]?$/;
   function parseCandFrom(raw) {
     var out = {}, last = null;
     cleanRaw(raw).split('\n').forEach(function (line) {
       var l = line.replace(/\*\*/g, '').replace(/^\s*(?:[-*•>]|\d+[.、)）])\s*/, '').trim(); if (!l) return;
-      var m = l.match(/^(性别|年龄|外形|入行前|为什么来|人话|本事|卡在哪|自我介绍|面试)\s*[|｜:：]\s*(.*)$/);
-      if (m) { last = FROM_KEY[m[1]]; out[last] = (out[last] ? out[last] + ' ' : '') + m[2].trim(); return; }
+      var m = l.match(/^(性别|年龄|外形|入行前|为什么来|人话|本事|卡在哪|自我介绍|面试|经验|组里说她|说话|体质|床上|XP|NG)\s*[|｜:：]\s*(.*)$/i);
+      if (m) { last = FROM_KEY[/^(xp|ng)$/i.test(m[1]) ? m[1].toUpperCase() : m[1]]; out[last] = (out[last] ? out[last] + ' ' : '') + m[2].trim(); return; }
       if (last && last !== 'sex' && last !== 'age') out[last] += ' ' + l;
     });
     var sex = String(out.sex || ''), male = /男/.test(sex) && !/女/.test(sex), age = Number((String(out.age || '').match(/\d{2}/) || [])[0]);
     out.age = age >= 18 && age <= 60 ? age : 0;
-    ['look', 'past', 'motive'].forEach(function (k) { if (out[k] && FROM_SKIP.test(out[k].trim())) delete out[k]; });
+    ['look', 'past', 'motive', 'rank', 'grade', 'talk', 'phys', 'react', 'xp', 'ng'].forEach(function (k) { if (out[k] != null && (!String(out[k]).trim() || FROM_SKIP.test(String(out[k]).trim()) || /照格子/.test(out[k]))) delete out[k]; });
     if (out.want) out.want = oneLine(out.want);
     var miss = ['want', 'intro'].filter(function (k) { return !out[k]; });
     return { ok: !male && !miss.length, male: male, data: out, miss: miss };
@@ -2010,7 +2065,7 @@ var PIANCHANG_CORE = (function () {
     poseFamily: poseFamily, POSE_CAM: POSE_CAM, poseCamLines: poseCamLines, scenePoses: scenePoses, drawPoses: drawPoses, tagNames: tagNames, fixTags: fixTags, isPovSc: isPovSc, POV: POV, povOf: povOf, tagFix: tagFix, headForShoot: headForShoot, ncKey: ncKey, NC_RECENT: NC_RECENT,
     STYLE_JA: STYLE_JA, STYLE_JA_POV: STYLE_JA_POV, MULTI_RULES: MULTI_RULES, scFilterOk: scFilterOk, scFilterOn: scFilterOn, scFilterBar: scFilterBar, scFilterClick: scFilterClick,
     buildStep1: buildStep1, buildStep2: buildStep2, STEP1_RETRY: STEP1_RETRY, STEP2_RETRY: STEP2_RETRY,
-    parseScript: parseScript, parseScene: parseScene, mergeScene: mergeScene, scriptSane: scriptSane, pickMishapScene: pickMishapScene, parseRoles: parseRoles, scriptAllText: scriptAllText, makeIdea: makeIdea, ideaEmpty: ideaEmpty, ideaText: ideaText, ideaLineup: ideaLineup, draftLineup: draftLineup, draftPov: draftPov, floorDraft: floorDraft,ideaTier: ideaTier, applyIdea: applyIdea, ideaUnused: ideaUnused, markIdea: markIdea, lineCore: lineCore, cleanRaw: cleanRaw, sgFailKind: sgFailKind, failText: failText,
+    parseScript: parseScript, parseScene: parseScene, mergeScene: mergeScene, scriptSane: scriptSane, pickMishapScene: pickMishapScene, parseRoles: parseRoles, scriptAllText: scriptAllText, makeIdea: makeIdea, ideaEmpty: ideaEmpty, ideaText: ideaText, ideaLineup: ideaLineup, draftLineup: draftLineup, draftPov: draftPov, floorDraft: floorDraft, walletScan: walletScan, walletStrip: walletStrip, applyRec: applyRec, candFromMore: candFromMore,ideaTier: ideaTier, applyIdea: applyIdea, ideaUnused: ideaUnused, markIdea: markIdea, lineCore: lineCore, cleanRaw: cleanRaw, sgFailKind: sgFailKind, failText: failText,
     markPlayer: markPlayer, castLine: castLine, shootPrompt: shootPrompt, softPose: softPose, softLines: softLines, doneLine: doneLine, statusPrompt: statusPrompt, parseStatus: parseStatus,
     PORTRAIT_N: PORTRAIT_N, PORTRAIT_BASE: PORTRAIT_BASE, portraitOk: portraitOk, portraitUrl: portraitUrl, pickPortrait: pickPortrait, fillPortraits: fillPortraits,
     drawMan: drawMan, drawMen: drawMen, manLines: manLines, gradeLine: gradeLine, drawCand: drawCand, drawCands: drawCands, drawTraits: drawTraits, drawSpice: drawSpice, spicePool: spicePool, drawLook: drawLook, portraitFit: portraitFit, pickPortraitFor: pickPortraitFor, reqOfText: reqOfText, archOf: archOf, NC_LAYERS: NC_LAYERS, NC_KEYS: NC_KEYS, NC_LABEL: NC_LABEL, ncLines: ncLines, candLines: candLines, npcFaces: npcFaces, drawXP: drawXP, drawNG: drawNG, filmFee: filmFee, buildCandPrompt: buildCandPrompt, CAND_RETRY: CAND_RETRY, parseCands: parseCands, buildCandFromPrompt: buildCandFromPrompt, parseCandFrom: parseCandFrom, CAND_FROM_RETRY: CAND_FROM_RETRY, parseCandOne: parseCandOne, personLines: personLines,
@@ -3911,6 +3966,10 @@ var PIANCHANG_DD = (function () {
       var names = getCharWorldbookNames('current'), books = [];
       if (names && names.primary) books.push(names.primary);
       if (names && names.additional) books = books.concat(names.additional);
+      // v0.1.39（crazyman2333：自己写的女优世界书没被读到）：聊天世界书、全局世界书也读；同一本只读一次
+      try { var cw = typeof getChatWorldbookName === 'function' ? getChatWorldbookName('current') : null; if (cw) books.push(cw); } catch (e2) {}
+      try { if (typeof getGlobalWorldbookNames === 'function') books = books.concat(getGlobalWorldbookNames() || []); } catch (e3) {}
+      books = books.filter(function (b, k) { return b && books.indexOf(b) === k; });
       var all = [];
       for (var i = 0; i < books.length; i++) { try { var es = await getWorldbook(books[i]); if (es && es.length) all = all.concat(es); } catch (e1) {} }
       if (all.length) { _wb = all; _wbAt = Date.now(); }
@@ -3926,7 +3985,19 @@ var PIANCHANG_DD = (function () {
       var n = String(es[i].name || '');
       if (es[i].enabled !== false && /【npc】/.test(n) && want.indexOf(n.replace(/^.*【npc】\s*/, '').trim()) >= 0) return String(es[i].content || '').trim();
     }
-    return '';
+    // v0.1.39（crazyman2333：自己写的女优世界书，标题没有【npc】，一个字都没读到）：再按标题、触发词认——
+    //   标题里有她的名字（「相泽南」「【女优】相泽南」「相泽南（FALENO）」），或者触发词里正好有她的名字；正文里也得提到她，免得认成一条只是拿她名字当触发词的事件
+    var w2 = want.filter(function (x) { return x.length >= 2; }), best = null, bestS = 0;
+    es.forEach(function (e) {
+      if (!e || e.enabled === false) return;
+      var t = String(e.name || e.comment || ''), body = String(e.content || ''), ks = ((e.strategy && e.strategy.keys) || e.key || e.keys || []);
+      w2.forEach(function (x) {
+        if (body.indexOf(x) < 0) return;
+        var sc = t.replace(/[【】\[\]（）()「」·\s:：\-—_|｜]/g, '') === x ? 3 : (t.indexOf(x) >= 0 && t.length <= x.length + 12) ? 2 : (Array.isArray(ks) && ks.some(function (k) { return typeof k === 'string' && k.trim() === x; })) ? 1 : 0;
+        if (sc > bestS) { bestS = sc; best = body.trim(); }
+      });
+    });
+    return best || '';
   }
   function namesOf(c) { var a = [c.name]; if (c.ref) [c.ref.stageName, c.ref.realName, c.ref.name].forEach(function (x) { if (x && a.indexOf(x) < 0) a.push(x); }); return a; }
   async function personaOf(c, s) {
@@ -5389,7 +5460,7 @@ var PIANCHANG_DD = (function () {
       }
     }
     var reroll = !!REROLL_TYPES[type];
-    if (!n && !reroll && !blocks.length) return 0;
+    if (!n && !reroll && !blocks.length) { await addHint(txt, s, mesId); return 0; }
     await C.save(function (s2) {
       if (reroll) Object.keys(s2.dd.h || {}).forEach(function (id) {   // 重 roll 了这一楼：上一版这一楼送来的消息收回
         var h = s2.dd.h[id] || [], keep = h.filter(function (x) { return x.fromFloor !== mesId; });
@@ -5407,7 +5478,79 @@ var PIANCHANG_DD = (function () {
       try { await setChatMessages([{ message_id: m.message_id, message: txt.replace(re, '').replace(/\n{3,}/g, '\n\n').replace(/\s+$/, '') }], { refresh: 'affected' }); } catch (e) {}
     }
     if (n) { C.badge(); refreshInjection(); noticeArrive(order.map(function (id) { return land[id].c.name; })); if (rootLive() && view.screen === 'home') renderHome(); else if (view.screen === 'chat' && land[view.id]) renderMessages(view.id); }
+    await addHint(txt, st(), mesId);
     return n;
+  }
+  // v0.1.39（crazyman2333「正文里已经加上了，还是没有，只能用小柯加」）：模型没写 <!--叮叮--> 那段、或者写了名字对不上，脚本自己在正文里找「扫码 / 加了叮叮 / 交换号码」，
+  //   那一句里点到的人还不在通讯录里，就弹一条「点这条加上」：点了才加（不靠模型听话；也不把路人自动塞进来）
+  //   认人：那一句里出现的熟名字（面试过的、签着的、银星的、世界书里有条目的），或者「某某的码 / 和某某互加 / 加了某某的叮叮」里的某某——
+  //   后者从长到短试（「扫了一下相泽南小姐的码」→ 相泽南），要在最近 40 楼里出现过两次以上、或者世界书里有她，才算是个人名
+  var HINT_ACT = /扫[^。！？!?\n]{0,10}(?:码|二维码)|加[^。！？!?\n]{0,8}(?:叮叮|盯盯|好友|联系方式|微信)|(?:交换|互加|互留|留了|存了|存下)[^。！？!?\n]{0,8}(?:号码|电话|联系方式|叮叮|盯盯|微信)|(?:叮叮|盯盯|二维码|联系方式|号码)[^。！？!?\n]{0,6}(?:给了|留给|发给|递给|推给)/;
+  var HINT_CAP = ['([一-鿿·]{2,10})的(?:叮叮|盯盯|二维码|码|联系方式|手机号|号码|电话|微信)', '(?:和|跟|与)([一-鿿·]{2,10}?)(?:互加|交换|互留|加了|互相)', '加了?([一-鿿·]{2,10}?)的?(?:叮叮|盯盯|好友|微信)'];
+  var HINT_TITLE = /(?:小姐|老师|女士|姐姐|妹妹|先生|社长|导演|前辈|阿姨|大姐|酱|桑)$/, HINT_NOT = /[她他你我您它们这那哪谁的了着过把被让给和跟与]|对方|自己|大家|人家|一下/;
+  var HINT_SEEN = {}, HINT_PEND = {};
+  function chatKey() { try { return String(SillyTavern.getCurrentChatId() || ''); } catch (e) { return ''; } }
+  function hintSubs(x) {
+    x = String(x || '').replace(HINT_TITLE, '').replace(HINT_TITLE, '');
+    var out = [];
+    for (var len = Math.min(4, x.length); len >= 2; len--) { var t = x.slice(-len); if (!HINT_NOT.test(t)) out.push(t); }
+    return out;
+  }
+  // 像个人：最近的正文里它后面跟过人才做的事（说、笑、把、递、点头……）或者引号台词；「扫了桌上的码点单」的「桌上」不算
+  function hintPerson(t, story) { return new RegExp(t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?:说|笑|道|问|答|看|把|抬|低|伸|走|站|坐|递|接|点头|摇头|开口|皱|眨|咬|红了|轻声|小声|愣|叹|哼|喊|叫|冲|朝|对|：|:|「|“)').test(story); }
+  function hintKnown(s) {
+    var L0 = Lx(), ds = s.dir || {}, a = [];
+    [].concat(s.met || [], ds.cast || [], ds.alumni || [], (ds.cands && ds.cands.cands) || [], L0.cast0 || []).forEach(function (p) { if (p) [p.realName, p.stageName, p.name].forEach(function (n) { if (n && String(n).length >= 2) a.push(String(n)); }); });
+    return a;
+  }
+  async function hintNames(txt, s) {
+    var story = washFloor(txt); if (!story || !HINT_ACT.test(story)) return [];
+    var sents = story.split(/[。！？!?\n…]+/).filter(function (x) { return HINT_ACT.test(x); }), U = uc(s), out = [], seenT = null;
+    var npcs = (await wbEntries()).filter(function (e) { return e && e.enabled !== false && /【npc】/.test(String(e.name || '')); }).map(function (e) { return String(e.name).replace(/^.*【npc】\s*/, '').trim(); });
+    var known = hintKnown(s).concat(npcs);
+    var ok = function (n) { return n && n.length >= 2 && n !== U && out.indexOf(canonName(n)) < 0 && !contactByName(n, s) && n !== K_NAME && n !== K_NICK && !staffList(s).some(function (x) { return x[0] === n; }); };
+    for (var i = 0; i < sents.length && out.length < 2; i++) {
+      var sen = sents[i];
+      known.forEach(function (n) { if (out.length < 2 && sen.indexOf(n) >= 0 && ok(n)) out.push(canonName(n)); });
+      for (var k = 0; k < HINT_CAP.length && out.length < 2; k++) {
+        var re = new RegExp(HINT_CAP[k], 'g'), m;
+        while ((m = re.exec(sen)) && out.length < 2) {
+          var subs = hintSubs(m[1]);
+          for (var j = 0; j < subs.length; j++) {
+            var t = subs[j]; if (!ok(t)) { if (contactByName(t, s) || t === U) break; continue; }
+            if (seenT == null) seenT = await seenText(s);
+            if ((seenT.split(t).length - 1 >= 2 && hintPerson(t, seenT)) || await wbNpc(t)) { out.push(canonName(t)); break; }
+          }
+        }
+      }
+    }
+    return out;
+  }
+  async function addHint(txt, s, mesId) {
+    try {
+      if (!hasIdentity(s)) return;
+      var names = await hintNames(txt, s);
+      for (var i = 0; i < names.length; i++) {
+        var nm = names[i], key = chatKey() + '|' + nm; if (HINT_SEEN[key]) continue;
+        var t = await cardTarget(nm, s, nm); if (!t || t.had) continue;
+        HINT_SEEN[key] = 1; HINT_PEND[nm] = t;
+        var msg = '正文里好像当面加了 ' + nm + ' 的' + APP + '，' + APP + '里还没有这个人。点这条加上', go = function () { hintAdd(nm); };
+        try { if (typeof toastr !== 'undefined') toastr.info(msg, '声色片场 · ' + APP, { timeOut: 20000, extendedTimeOut: 10000, closeButton: true, tapToDismiss: true, onclick: go }); } catch (e) {}
+        try { console.info('[叮叮] ' + msg); } catch (e) {}
+      }
+    } catch (e) { try { console.warn('[叮叮] 正文加好友兜底出错', e); } catch (e2) {} }
+  }
+  async function hintAdd(nm) {
+    var t = HINT_PEND[nm]; if (!t) return false;
+    delete HINT_PEND[nm];
+    var s = st(); if (contactByName(t.name, s)) return false;
+    await C.save(function (s2) {
+      addContact(s2, t.id, Object.assign({}, t.info, { sub: (t.info && t.info.sub) || '正文里当面加的' }));
+      pushMsgs(s2, t.id, [Object.assign({ id: mid() + 'h', sender: t.id, senderName: t.name, kind: 'note' }, stamp(s2), { text: '在正文里当面加了' + APP })], viewing(t.id));
+    });
+    C.badge(); refreshInjection(); if (rootLive() && view.screen === 'home') renderHome();
+    C.toast('success', t.name + ' 进了你的' + APP);
+    return true;
   }
   // 这一楼里谁在场：正文里出现了名字的联系人（柯大河也算，小柯也认）
   function presentIn(text, s) {
@@ -5694,7 +5837,7 @@ var PIANCHANG_DD = (function () {
     busy: function () { return !!(generating || _call); },   // v0.1.28：玩家发的消息正在等回 / 正在通话（主脚本的楼层存档点算「动过」）
     notifyEvent: notifyEvent, onMainReceived: onMainReceived, os: { contacts: osContacts, contact: osContact, current: osCurrent, openByName: openByName }, gen: gen, apiCfg: customApi, ttsOn: ttsOn, speak: speak, stopVoice: stopVoice, renderFloorBubbles: renderFloorBubbles, floorTheme: floorTheme, APP: APP,
     _t: { splitBatch: splitBatch, batchPrompt: batchPrompt, parsePrivate: parsePrivate, parseGroup: parseGroup, parseNpcLine: parseNpcLine, parseCallText: parseCallText, inviteChatId: inviteChatId, resolveSticker: resolveSticker, privatePrompt: privatePrompt, groupPrompt: groupPrompt, groups: groups, findChat: findChat, view: function () { return view; },
-      fenceRows: fenceRows, splitTail: splitTail, parseBubs: parseBubs, floorScan: floorScan, maybeAmbient: maybeAmbient, washFloor: washFloor, ttsSegs: ttsSegs, fishOf: fishOf, cfg: cfg, saveCfg: saveCfg, phoneRule: phoneRule, phoneAddRule: phoneAddRule, cleanAI: cleanAI, refreshInjection: refreshInjection, AMB: AMB, onPromptReady: onPromptReady, flushN: function () { return _flushN; }, genCount: function () { return _genCount; } },
+      fenceRows: fenceRows, splitTail: splitTail, parseBubs: parseBubs, floorScan: floorScan, maybeAmbient: maybeAmbient, washFloor: washFloor, ttsSegs: ttsSegs, fishOf: fishOf, cfg: cfg, saveCfg: saveCfg, phoneRule: phoneRule, phoneAddRule: phoneAddRule, cleanAI: cleanAI, refreshInjection: refreshInjection, AMB: AMB, hintNames: hintNames, hintAdd: hintAdd, hintPend: function () { return HINT_PEND; }, wbNpc: wbNpc, wbReset: function () { _wb = null; _wbAt = 0; }, onPromptReady: onPromptReady, flushN: function () { return _flushN; }, genCount: function () { return _genCount; } },
   };
 })();
 
@@ -6798,14 +6941,18 @@ var PIANCHANG_ONLINE = (function () {
       if (L0.err) return '<div class="eb">ONLINE</div><h2 class="h">挂不了</h2><div class="err">' + esc(L0.err) + '</div><div class="act"><button class="btn" data-act="modal-x">关上</button></div>';
       var r = L0.row, cfg = M.cfg, up = M.ui.up && M.ui.up.id === m.id ? M.ui.up : null, running = up && (up.stage === 'check' || up.stage === 'publish');
       var price = M.ui.price !== '' && M.ui.price != null ? M.ui.price : String(defaultPrice(r.tier, cfg));
+      // v0.1.39（10091009mc「挂不上去」）：没认领导演署名的，以前点了「挂上去」才说要署名；现在弹框里直接认领，没认领前「挂上去」点不了
+      var noName = !of(st).dirId;
+      var claimRow = noName ? '<div class="lbl">导演署名（挂片子要署名，全服先到先得）</div><div class="row" style="flex-wrap:nowrap"><input type="text" id="pc-ol-dname" maxlength="' + num(cfg.name_max, 8) + '" value="' + esc(M.ui.dname) + '" placeholder="1 到 ' + num(cfg.name_max, 8) + ' 个字"><button class="btn sm pri" data-act="ol-claim"' + (M.busy.claim ? ' disabled' : '') + '>认领</button></div>' + (M.err.claim ? '<div class="err">' + esc(M.err.claim) + '</div>' : '') : '';
       return '<div class="eb">ONLINE MARKET</div><h2 class="h">挂到玩家剧本</h2>' +
         '<div class="card"><div class="row">' + tierTag(r.tier) + '<b>《' + esc(r.title) + '》</b></div><div class="faint">' + esc(r.lineup) + ' · ' + r.scenes + ' 场 · 剧本 ' + r.len + ' 字 · ' + esc(r.film_no) + '</div>' +
-        (r.blurb ? '<div class="sub" style="margin-top:4px">' + esc(r.blurb) + '</div>' : '') + '<div class="faint" style="margin-top:4px">卡司：' + esc(r.cast.join('、') || '—') + ' · 署名：' + esc(of(st).dirName || '（还没认领）') + '</div></div>' +
+        (r.blurb ? '<div class="sub" style="margin-top:4px">' + esc(r.blurb) + '</div>' : '') + '<div class="faint" style="margin-top:4px">卡司：' + esc(r.cast.join('、') || '—') + ' · 署名：' + esc(of(st).dirName || '（还没认领）') + '</div></div>' + claimRow +
         '<div class="lbl">一份卖多少（' + esc(money(cfg.price_min)) + ' 到 ' + esc(money(cfg.price_max)) + '）</div><input type="text" inputmode="numeric" id="pc-ol-price" value="' + esc(price) + '">' +
         '<div class="faint" style="margin-top:4px">别的玩家买一份，你到账 = 价格 × ' + num(cfg.online_mul, 10) + '。买家花的是他自己游戏里的钱。</div>' +
         '<label class="row" style="margin-top:10px;flex-wrap:nowrap;align-items:flex-start;gap:8px;font-size:13.5px"><input type="checkbox" id="pc-ol-agree"' + (M.ui.agree ? ' checked' : '') + ' style="width:auto;min-height:0;margin-top:4px">剧本全文会卖给别的玩家（买之前只看得到片头）；挂之前服务器会先过一遍过滤。</label>' +
         (up && up.err ? '<div class="err" style="margin-top:8px">' + esc(up.err) + '</div>' : '') + (running ? '<div class="busy" style="margin-top:8px">' + (up.stage === 'check' ? '服务器在预检……' : '在上架……') + '</div>' : '') +
-        '<div class="act"><button class="btn" data-act="modal-x">算了</button><button class="btn pri" data-act="ol-list-go" data-id="' + esc(m.id) + '"' + (running ? ' disabled' : '') + '>挂上去</button></div>';
+        (noName ? '<div class="faint" style="margin-top:8px">先在上面认领署名，才能挂上去。</div>' : '') +
+        '<div class="act"><button class="btn" data-act="modal-x">算了</button><button class="btn pri" data-act="ol-list-go" data-id="' + esc(m.id) + '"' + (running || noName ? ' disabled' : '') + '>挂上去</button></div>';
     }
     if (m.kind === 'ol-price') {
       var x = of(st).stats[m.id] || {};
@@ -6939,7 +7086,8 @@ var PIANCHANG_ONLINE = (function () {
   }
   function change(el) {
     if (el && el.getAttribute && el.getAttribute('data-ol') === 'sort') { M.ui.sort = el.value || 'new'; M.ui.page = 0; M.data.shop = null; loadShop(); return true; }
-    if (el && el.id === 'pc-ol-agree') { M.ui.agree = !!el.checked; return true; }
+    // v0.1.39（10091009mc：勾上了还挂着「先勾一下」）：勾选不重画，上一次的红字一直留着；现在一勾就消
+    if (el && el.id === 'pc-ol-agree') { M.ui.agree = !!el.checked; if (M.ui.up && M.ui.up.stage === 'form' && M.ui.up.err) { M.ui.up.err = ''; rerender(); } return true; }
     return false;
   }
   function enter(el) {
@@ -7572,8 +7720,17 @@ var PIANCHANG_ONLINE = (function () {
   // 【片场近况】每轮挂，深度 1，system；玩家看不见。剧情时间照纸醉金迷的 [TIME]：脚本读完就从楼层里擦掉
   function timeAsk(st) {
     return '这条回复写完，最后单独一行写剧情时间 [TIME:HH:MM|M/D]：这条回复结尾那一刻的时间。片场日历上今天是第 ' + st.day + ' 天 = ' + C.mdShort(st.day) + '，现在是 ' + C.mdShort(st.day) + ' ' + st.clock + '；日期从这天往后接，同一天里的事都写 ' + C.mdShort(st.day) + '，故事过了夜才写第二天的日期。' +
-      '预设要你在文末写状态栏、变量的照写，这一行另外写，不算在它们里面，格式一字不改。';   // v0.1.30（crazyman2333：文尾插入数值变量，[TIME] 被挤掉）
+      '预设要你在文末写状态栏、变量的照写，这一行另外写，不算在它们里面，格式一字不改。' +   // v0.1.30（crazyman2333：文尾插入数值变量，[TIME] 被挤掉）
+      walletAsk(st);
   }
+  // v0.1.39（10091009mc、crazyman2333「正文赚的钱和脚本赚的钱对不上」，照一掷千金的 [WALLET]）：正文里 {{user}} 自己的钱有进出就写一行，onTimeTag 记账、擦掉
+  function walletAsk(st) {
+    return '\n这条回复里{{user}}自己的钱有进出（外快、红包、赌赢、卖东西、请客、买东西、赔钱），在 [TIME] 那一行前面一笔单独写一行 [WALLET:+¥金额:事由] 或 [WALLET:-¥金额:事由]，脚本照这个记进{{user}}的' + moneyLabel(identity(st)) +
+      '；片酬、棚租、剧组、签约金、借调费、外包结款这些面板自己结算的不写，没有进出就不写。';
+  }
+  // 记账：正文写的进出，一笔一行进账本；只在这一楼照新楼算的时候记（重抽没退回存档点的，上一版的账还在，这一版不再记）
+  function walletBook(s, ops) { ops.forEach(function (o) { addLedger(s, 'story', o.amount, '正文：' + (o.note || (o.amount > 0 ? '进账' : '花销'))); }); }
+  function walletToast(ops) { if (ops.length) toast('success', '正文记账：' + ops.map(function (o) { return (o.amount > 0 ? '+' : '') + money(o.amount) + (o.note ? '（' + o.note + '）' : ''); }).join('，')); }
   var NEWS_GOT = {}, NEWS_GONE = {};
   function recentLine(st, news) {
     st = st || readState();
@@ -8642,7 +8799,7 @@ var PIANCHANG_ONLINE = (function () {
     }
     mine.busy = false;
     if (r && r.male) { mine.cands = mine.cands.filter(function (x) { return x !== p; }); if (UI.hlCand === p.id) UI.hlCand = null; await persistCasting(); render(); toast('warning', '选角只招女优：' + p.realName + ' 是男的，约不来面试'); return; }
-    if (r && r.ok) fillCandFrom(p, r.data, st, mine); else { p.status = 'error'; p.err = err ? errMsg(err) : C.failText(C.sgFailKind(raw), r ? '缺：' + r.miss.join('、') : ''); }
+    if (r && r.ok) { fillCandFrom(p, r.data, st, mine); if (ev && ev.wb) p.recWb = 1; else delete p.recWb; } else { p.status = 'error'; p.err = err ? errMsg(err) : C.failText(C.sgFailKind(raw), r ? '缺：' + r.miss.join('、') : ''); }
     await persistCasting(); render();
     if (p.status === 'ok') toast('success', p.realName + ' 来了，在选角页等着：签不签照常谈');
   }
@@ -8655,6 +8812,7 @@ var PIANCHANG_ONLINE = (function () {
       p.look = C.clip(d.look, 60); p.lookReq = C.reqOfText(p.look, p.age);
       p.portrait = C.pickPortraitFor(p.lookReq, p.age, st.dir.cast.concat(mine.cands.filter(function (x) { return x !== p; })).map(function (x) { return x.portrait; }).concat(C.npcFaces()));
     }
+    C.applyRec(p, d);   // v0.1.39：有记录的人，经验、组里说她、体质、床上、说话、XP、NG 也照记录
     p.status = 'ok'; delete p.err;
   }
   function interviewText(p, st) {
@@ -9864,7 +10022,7 @@ var PIANCHANG_ONLINE = (function () {
       '<h3 class="pc-name"><span class="rb">NEWCOMER' + (ok ? ' · 本名' : '') + '</span>' + esc(ok || c.ddFrom ? c.realName : c.surname + ' ……') + '<small>' + c.age + ' 岁 · ' + esc(c.hometown) + '</small></h3>' +
       '<div class="pc-line">' + tierTag(c.tier) + (c.grade ? '<span class="tag' + (c.gradeKey === 'S' || c.gradeKey === 'SS' ? '' : ' gr') + '" data-pc-grade="' + esc(c.gradeKey) + '">' + esc(c.grade) + ' · ' + esc(c.gradeKey) + '</span>' : '') + '<span>' + esc(c.rankLabel) + ' · 一部 ' + esc(money(c.fee)) + ' · 签约金 ' + esc(money(c.signFee)) + '</span></div>' +
       (c.forScript ? '<div class="pc-line"><span class="tag gr" data-pc-for="' + esc(c.forScript.sid || '') + '">冲《' + esc(c.forScript.title) + '》来的</span>' + (c.firstTime ? '<span class="tag">第一次进棚</span>' : '') + '</div>' : '') +
-      (c.ddFrom ? '<div class="pc-line"><span class="tag gr" data-pc-dd="' + esc(c.ddFrom) + '">叮叮约来的</span></div>' : '');   // v0.1.28
+      (c.ddFrom ? '<div class="pc-line"><span class="tag gr" data-pc-dd="' + esc(c.ddFrom) + '">叮叮约来的</span>' + (c.recWb ? ' <span class="tag gr" data-pc-recwb>照世界书写的</span>' : '') + '</div>' : '');   // v0.1.28；v0.1.39 读到了她的世界书条目
     if (c.status === 'loading') return '<article class="pc-tal' + (UI.hlCand && UI.hlCand === c.id ? ' hl' : '') + '" data-pc-card="cand" data-id="' + esc(c.id) + '">' + h + '<div class="busy" style="margin-top:12px">她在门口填表……</div></div></article>';
     // 卡面只放最有戏的六层（一项一行）；其余几层进「请她进来聊聊」的人设。v0.1.5 以前的候选人没有抽签池那几层，照旧显示本事 / 卡在哪
     h += profRows(c.pool >= 2 ? [['外形', c.look], ['入行前', c.past], ['为什么来', c.motive], ['心里话', g.want || c.need], ['卡在哪', c.stuck], ['面试那天', c.entrance], ['组里说她', C.gradeLine(c, true)], ['体质', c.phys], ['床上', c.react], ['说话', c.talk]]
@@ -11256,8 +11414,16 @@ var PIANCHANG_ONLINE = (function () {
     async function doTime() {
     try {
       var ms = getChatMessages(mesId); var m = ms && ms[0]; if (!m || m.role !== 'assistant') return;
-      var txt = String(m.message || ''), all = txt.match(TIME_RE_ALL);
-      if (!all) { timeMiss(type); return; }
+      var txt = String(m.message || ''), W = C.walletScan(txt), pay = W.ops.length && !TIME_NO_ADV[type] ? W.ops : [];   // v0.1.39：[WALLET] 跟 [TIME] 一起读、一起擦
+      if (W.ops.length && !pay.length && type !== 'continue') rbTell('重抽前动过面板，这一版正文里的进出账没记（上一版记的还在账本里）');
+      if (type === 'continue') pay = W.ops;   // 续写：上一截的标签早擦掉了，这次读到的都是新写的
+      txt = W.clean;
+      var all = txt.match(TIME_RE_ALL);
+      if (!all) {
+        if (W.hits) { try { await setChatMessages([{ message_id: m.message_id, message: txt.replace(/\n{3,}$/, '\n').trimEnd() }], { refresh: 'affected' }); } catch (e) {} }
+        if (pay.length) { await save(function (s) { walletBook(s, pay); }); walletToast(pay); render(); }
+        timeMiss(type); return;
+      }
       TIME_MISS = 0;
       var mm = all[all.length - 1].match(TIME_RE);   // 有好几个就认最后一个
       var hh = Math.min(23, Number(mm[1])), mi = mm[2], st = readState(), adv = 0, wild = 0;
@@ -11270,9 +11436,11 @@ var PIANCHANG_ONLINE = (function () {
       var clean = txt.replace(TIME_RE_ALL, '\n').replace(/\n{3,}$/, '\n').trimEnd();
       try { await setChatMessages([{ message_id: m.message_id, message: clean }], { refresh: 'affected' }); } catch (e) {}
       // v0.1.26（crazyman2333：正文写「过了两个星期」不跳）：超过 7 天不再整条不认，打开面板问一句，玩家点「好」才跳；AI 写错的现实日期点「算了」
-      if (wild) { UI.modal = { kind: 'endday', n: wild, why: (mm[3] ? mm[3] + '/' : '') + mm[4] + '/' + mm[5], clock: pad2(hh) + ':' + mi }; openPanel(); return; }
+      if (wild && pay.length) { await save(function (s) { walletBook(s, pay); }); walletToast(pay); }
+      if (wild) { UI.modal ={ kind: 'endday', n: wild, why: (mm[3] ? mm[3] + '/' : '') + mm[4] + '/' + mm[5], clock: pad2(hh) + ':' + mi }; openPanel(); return; }
       var out = [];
-      await save(function (s) { for (var i = 0; i < adv; i++) rollDay(s, out, i < adv - 1); s.clock = pad2(hh) + ':' + mi; });
+      await save(function (s) { walletBook(s, pay); for (var i = 0; i < adv; i++) rollDay(s, out, i < adv - 1); s.clock = pad2(hh) + ':' + mi; });   // 先记正文里的账（那是今天的事），再过日子
+      walletToast(pay);
       if (adv) { out.unshift('正文过了 ' + adv + ' 天，现在是 ' + C.mdText(st.day + adv)); rollToasts(out); }
       render();
     } catch (e) {}
@@ -11601,7 +11769,7 @@ var PIANCHANG_ONLINE = (function () {
         portraitOfName: function (nm) { var k = (L.npcPortrait || {})[String(nm || '')]; return k ? picUrl(k) : ''; }, addLedger: addLedger,
         faceOf: function (c) { return ddFace(c).u; }, faceFb: function (c) { return ddFace(c).fb; }, faceTap: function (c) { ddFaceTap(c); },   // 叮叮的头像（自己换的优先）、点聊天顶上的头像
         invAct: function (id, a) { if (a === 'go') return goInvite(id); return setInvStatus(id, a === 'accept' ? 'accepted' : 'ignored'); },
-        storyOnly: function (t) { return String(t || '').replace(TIME_RE, '\n'); },
+        storyOnly: function (t) { return C.walletStrip(String(t || '').replace(TIME_RE, '\n')); },
         play: function () { return Promise.resolve(); }, ttsReady: function () { return false; }, voiceOf: function () { return ''; }, stopAudio: function () {},
         floorQ: function (fn) { _memoQ = _memoQ.then(fn, fn); return _memoQ; },
         themeHost: function () { try { applyTheme(); } catch (e) {} return PANEL; },   // 正文里叮叮的美化聊天窗从面板上读当前配色
