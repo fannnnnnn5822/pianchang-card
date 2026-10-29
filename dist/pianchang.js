@@ -2154,16 +2154,31 @@ var PIANCHANG_CORE = (function () {
   var WALLET_SRC = '[\\[［【]\\s*(?:WALLET|钱包|记账)\\s*[:：]\\s*([+\\-−－＋]?)\\s*(?:\\$|¥|￥|RMB|rmb)?\\s*(\\d[\\d,，]*(?:\\.\\d+)?)\\s*(万|萬|千|[wWkK])?\\s*(?:元|块|圆|RMB|rmb)?\\s*(?:[:：|｜]\\s*([^\\]］】\\n]*))?[\\]］】]';
   function walletStrip(t) { return String(t == null ? '' : t).replace(new RegExp('\\n?[ \\t]*' + WALLET_SRC + '[ \\t]*', 'gi'), ''); }
   // → { ops: [{ amount（正进负出）, note }], hits: 认出来几个标签（金额是 0 的也算，照样擦掉）, clean: 擦掉标签的正文 }
+  // v0.1.48（亚伦「扣钱都是扣两次，重 roll 还多扣一次」）：预设把思维链留在楼里，模型先在思考里草拟一遍 [WALLET]，正文末尾再写一遍，同一笔记了两次。
+  //   记账只认思维链、注释外面的标签（整楼都在思维链里才退回认全楼）；同一楼里金额、事由一模一样的只记一笔。擦照旧全擦
   function walletScan(raw) {
-    var t = String(raw == null ? '' : raw), re = new RegExp(WALLET_SRC, 'gi'), ops = [], hits = 0, m;
+    var t = String(raw == null ? '' : raw), hits = (t.match(new RegExp(WALLET_SRC, 'gi')) || []).length;
+    var ops = walletOps(tagZone(t)); if (!ops.length && hits) ops = walletOps(t);
+    var seen = {};
+    ops = ops.filter(function (o) { var k = o.amount + '|' + o.note.replace(/\s+/g, ''); if (seen[k]) return false; seen[k] = 1; return true; });
+    return { ops: ops, hits: hits, clean: hits ? walletStrip(t) : t };
+  }
+  function walletOps(t) {
+    var re = new RegExp(WALLET_SRC, 'gi'), ops = [], m;
     while ((m = re.exec(t))) {
-      hits++;
       var n = parseFloat(String(m[2]).replace(/[,，]/g, '')) || 0, u = m[3] || '';
       n = Math.round(n * (/[万萬wW]/.test(u) ? 10000 : /[千kK]/.test(u) ? 1000 : 1));
       if (!n || n > 1e10) continue;
       ops.push({ amount: /[-−－]/.test(m[1]) ? -n : n, note: clip(String(m[4] || '').trim(), 30) });
     }
-    return { ops: ops, hits: hits, clean: hits ? walletStrip(t) : t };
+    return ops;
+  }
+  // 楼里「真写出来」的那部分：去掉注释、成对的思维容器，开头那半截在预填里的（只剩收尾标签）也切掉
+  function tagZone(t) {
+    var tags = FLOOR_THINK + '|思考|思维链|思维';
+    var z = String(t == null ? '' : t).replace(/<!--[\s\S]*?-->/g, '').replace(new RegExp('<(' + tags + ')(?:\\s[^>]*)?>[\\s\\S]*?<\\/\\1\\s*>', 'gi'), '');
+    var lone = z.match(new RegExp('<\\/(?:' + tags + ')\\s*>', 'i')); if (lone) z = z.slice(lone.index + lone[0].length);
+    return z;
   }
   // v0.1.30（亚伦：在正文里跟 AI 聊剧本有活人感）：「自己写」的「从正文拿」，把一楼 AI 正文洗成草稿。照 skill 06 副轨第 8 条 + 小狸 Live 的 stripProse：
   //   整块删：注释（<!--叮叮-->）、style / script、思维容器、我们自己写进楼里的 📄 剧本块 / 叮叮折叠块 / ```chat 誊本、[TIME]
@@ -9035,6 +9050,7 @@ var PIANCHANG_ONLINE = (function () {
     if (typeof s.money !== 'number' || !isFinite(s.money)) s.money = 0;
     if (!Array.isArray(s.ledger)) s.ledger = [];
     if (!s.fix147) { s.fix147 = 1; feeBack(s); }
+    if (!s.fix148) { s.fix148 = 1; storyBack(s); }
     if (s.scene && !s.scene.text) delete s.scene;
     if (DD) { try { DD.norm(s); } catch (e) {} }
     // 玩家自己换的头像 / 立绘（v0.1.8）：s.imgs[谁] = { av 头像, il 立绘 }，只存引用（idb:编号 或 图片链接），base64 一律不收
@@ -9066,6 +9082,37 @@ var PIANCHANG_ONLINE = (function () {
       });
       if (w.ledger.length > 200) w.ledger = w.ledger.slice(-200);
     });
+  }
+  // v0.1.48（亚伦「扣钱都是扣两次」）：思维链里草拟的那行 [WALLET] 也记了一遍。同一楼的几笔正文账是挨着记的，挨着的这一串里同一天、同一个数、同一句扣款出现两遍，
+  //   退一笔（只退扣的，多记的进账留给玩家自己点「不算」）；读档时做一次（fix148），收起来的另一个身份的钱包也看
+  function storyBack(s) {
+    [s].concat(Object.keys(obj(s.wallets)).map(function (k) { return s.wallets[k]; })).forEach(function (w) {
+      if (!w || !Array.isArray(w.ledger)) return;
+      var run = {}, back = [];
+      w.ledger.forEach(function (l) {
+        if (!l || l.kind !== 'story') { run = {}; return; }
+        if (!(Number(l.amount) < 0) || l.x || l.rv) return;
+        var k = l.day + '|' + l.amount + '|' + l.note;
+        if (run[k]) back.push(l); else run[k] = 1;
+      });
+      back.forEach(function (l) {
+        var amt = -Math.round(Number(l.amount));
+        l.x = 1; w.money = Math.round((Number(w.money) || 0) + amt); s.lseq = (Number(s.lseq) || 0) + 1;
+        w.ledger.push({ day: s.day, kind: 'story', amount: amt, note: '退回多扣的一笔：' + String(l.note || '').replace(/^正文：/, '') + '（正文里同一笔写了两遍）', q: s.lseq, rv: l.q });
+      });
+      if (w.ledger.length > 200) w.ledger = w.ledger.slice(-200);
+    });
+  }
+  // v0.1.48：正文记的账（模型写错、写重了）点「不算」退回来：原来那笔划掉，另记一笔反向的
+  async function ledUndo(q) {
+    var got = null;
+    await save(function (s) {
+      var e = s.ledger.find(function (l) { return l && l.q === q && l.kind === 'story' && !l.x && !l.rv; }); if (!e) return;
+      e.x = 1; addLedger(s, 'story', -e.amount, '撤掉正文记的一笔：' + String(e.note || '').replace(/^正文：/, ''));
+      s.ledger[s.ledger.length - 1].rv = q; got = e;
+    });
+    if (got) toast('success', '这笔不算了：账上' + (got.amount < 0 ? '退回 ' : '扣回 ') + money(Math.abs(got.amount)));
+    render();
   }
   function readState() { return normState(clone(rawVar())); }
   var NPC_CAST = {}; (L.cast0 || []).forEach(function (c) { NPC_CAST[c.id] = 1; });
@@ -9304,7 +9351,10 @@ var PIANCHANG_ONLINE = (function () {
   }
   // v0.1.28：重抽（swipe / regenerate）先看要不要退回上一个存档点，再挂注入（酒馆会等这个监听跑完才拼提示词，所以注入照退回以后的存档写）
   //   最多等 4 秒：存档队列万一卡住，宁可这次不撤，也别把生成堵死
+  // v0.1.48：老一些的酒馆 MESSAGE_RECEIVED 不带生成类型，重抽回来的楼会被当成新楼记账、推日子。生成前记下这次是哪种，收楼时没给就用它
+  var GEN_TYPE = null;
   async function beforeGen(type, opt, dryRun) {
+    if (!dryRun && RB_GEN[type || 'normal']) GEN_TYPE = { t: type || 'normal', at: Date.now() };   // 只记会写楼的那几种（叮叮、面试那些后台生成不算）
     if (!dryRun && RB_GEN[type || 'normal']) { GEN_ON = Date.now(); try { await Promise.race([rbBeforeGen(type || 'normal'), new Promise(function (r) { setTimeout(r, 4000); })]); } catch (e) { try { console.warn('[声色片场] 重抽前退存档点失败', e); } catch (e2) {} } }
     onBeforeGen(type, opt, dryRun);
   }
@@ -11296,6 +11346,7 @@ var PIANCHANG_ONLINE = (function () {
     P + ' .ledger .r{display:grid;grid-template-columns:64px minmax(0,1fr) auto;gap:8px;padding:6px 0;border-bottom:1px solid var(--pc-line);font-size:13.5px;}',
     P + ' .ledger .r .a{font-variant-numeric:tabular-nums;white-space:nowrap;}',
     P + ' .ledger .r .a.p{color:var(--pc-green);}' + P + ' .ledger .r .a.m{color:#f08a80;}',
+    P + ' .ledger .r .undo{margin-left:6px;padding:0 2px;border:0;background:none;color:var(--pc-faint);font:inherit;font-size:12px;text-decoration:underline;cursor:pointer;}' + P + ' .ledger .r.x .n,' + P + ' .ledger .r.x .a{text-decoration:line-through;opacity:.55;}',
     P + ' .noid{display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;min-height:60vh;text-align:center;color:var(--pc-sub);}',
     P + ' .noid b{font-size:22px;color:var(--pc-ink);}',
     // 手机
@@ -12427,7 +12478,10 @@ var PIANCHANG_ONLINE = (function () {
   }
   function ledgerHtml(st) {
     var rows = st.ledger.slice().reverse().slice(0, 60);
-    return '<div class="ledger">' + (rows.length ? rows.map(function (r) { return '<div class="r"><span class="faint">' + esc(C.mdShort(r.day)) + '</span><span>' + esc(r.note) + '</span><span class="a ' + (r.amount >= 0 ? 'p' : 'm') + '">' + esc(money(r.amount)) + '</span></div>'; }).join('') : '<div class="faint">还没有记账。</div>') + '</div>';
+    return '<div class="ledger">' + (rows.length ? rows.map(function (r) {
+      var undo = r.kind === 'story' && r.q && !r.x && !r.rv ? '<button class="undo" data-act="led-undo" data-q="' + esc(r.q) + '" title="模型记错、记重了：这笔不算，钱退回来（扣回去）">不算</button>' : '';   // v0.1.48
+      return '<div class="r' + (r.x ? ' x' : '') + '"><span class="faint">' + esc(C.mdShort(r.day)) + '</span><span><span class="n">' + esc(r.note) + '</span>' + undo + '</span><span class="a ' + (r.amount >= 0 ? 'p' : 'm') + '">' + esc(money(r.amount)) + '</span></div>';
+    }).join('') : '<div class="faint">还没有记账。</div>') + '</div>';
   }
 
   // ── 弹层 ──
@@ -12746,6 +12800,7 @@ var PIANCHANG_ONLINE = (function () {
       // 选角 · 按剧本招
       case 'cast-script': UI.modal = { kind: 'byscript', sid: '', call: '' }; render(); break;
       case 'cs-call': if (UI.modal && UI.modal.kind === 'byscript') UI.modal.call = t.getAttribute('data-v') || ''; render(); break;
+      case 'led-undo': ledUndo(Number(t.getAttribute('data-q'))); break;
       case 'cs-go': { var bm = UI.modal; if (!bm || bm.kind !== 'byscript' || !bm.sid) break; var cr0 = castReqs(st, bm.sid, bm.call); if (!cr0) break; UI.modal = null; UI.tab = 'casting'; lsSet(TAB_KEY, UI.tab); startCasting({ sid: bm.sid, call: cr0.role.call }); break; }
       // 排练室
       case 'tk-mode': UI.tk.mode = t.getAttribute('data-v') === 'partner' ? 'partner' : 'dir'; render(); break;
@@ -13242,6 +13297,8 @@ var PIANCHANG_ONLINE = (function () {
     }
   }
   async function onMainReceived(mesId, type) {
+    if (!type && GEN_TYPE && Date.now() - GEN_TYPE.at < 600000) type = GEN_TYPE.t;
+    GEN_TYPE = null;
     if (type === 'first_message') return;
     // v0.1.28：生成前已经退回上一个存档点了 → 这一楼当新楼算（日子照新写的推、邀约照掷）；处理完记这一楼的存档点（排在叮叮读完正文以后）
     var fresh = RB_FRESH[mesId]; delete RB_FRESH[mesId]; RB_PEND = 0; GEN_ON = 0;
