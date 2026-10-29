@@ -6823,7 +6823,8 @@ var PIANCHANG_DD = (function () {
   function knowRules(who, U) { return OMNI_RULES(who, U); }
   function rich(U, priv) {
     return '- 想发表情包：单独一行写 <bqb>表情包名</bqb>，可选：' + stickerHint(30) + '\n' +
-      '- 转账：单独一行写 (转账|金额|留言)，比如 (转账|3000|打车钱报了)，金额是整数；符合人设和情境才发，比如报销、给定金、请客。\n' +
+      '- 转账：单独一行写 (转账|金额|留言)，比如 (转账|3000|上回你垫的打车钱)，金额是整数。转账＝钱从你自己兜里出、打到' + U + '账上，只在你真要给' + U + '钱时用，比如还' + U + '垫的钱、给定金、请客、发红包。\n' +
+      '- 想让' + U + '给你钱（报销、借钱、讨赔偿、让' + U + '请客、买东西的钱）：直接打字跟' + U + '开口，给不给、给多少由' + U + '自己点转账；这时候别写 (转账)，写了就成了你倒给' + U + '钱。\n' +
       '- 语音：单独一行写 (语音|要说的话)，话要像嘴上说的，可以更随意。\n' +
       '- ' + U + '给你转了账、你收下：单独一行写 (收款)。\n' +
       (priv ? '- 真被' + U + '惹急了、不想再理' + U + '：单独一行写 (拉黑|一句理由)。写了以后' + U + '的消息就送不到你这里，所以只在人设和剧情真走到这一步时用；已经拉黑、剧情里又明确和好了，单独一行写 (解除拉黑) 再接着说。\n' : '');
@@ -6873,7 +6874,7 @@ var PIANCHANG_DD = (function () {
       '- 谁会接这句谁说；可以互相接梗、抬杠，一个人连发两条也行。\n' +
       '- 每条 35 字以内，像真人在群里打字。\n' +
       '- 表情包写「名字：<bqb>表情包名</bqb>」，可选：' + stickerHint(20) + '\n' +
-      '- 转账写「名字：(转账|金额|留言)」，语音写「名字：(语音|内容)」，收' + U + '的转账写「名字：(收款)」；合适时才用。\n' +
+      '- 转账写「名字：(转账|金额|留言)」，钱从这个人兜里出、打给' + U + '；想跟' + U + '要钱就直接打字开口，别写转账。语音写「名字：(语音|内容)」，收' + U + '的转账写「名字：(收款)」；合适时才用。\n' +
       '- 只写群成员的消息；' + U + '说什么由' + U + '自己发。\n' +
       '直接输出消息。';
   }
@@ -6912,7 +6913,7 @@ var PIANCHANG_DD = (function () {
     var inp = $('in'); if (unsent && inp && !m.kind && m.text && !/^<bqb>/.test(m.text)) { inp.value = m.text; inp.focus(); }
     renderMessages(id); syncSendBtn(id); refreshInjection();
   }
-  // 玩家点开对方的转账：收款入账 + 系统行 + 攒一条让对方知道
+  // 玩家点开对方的转账：收款入账 + 系统行（v0.1.52 起不单独攒待发，下回发消息对方就知道）
   async function claimTransfer(id, mId) {
     var ok = false, amt = 0, who = '';
     await C.save(function (s) {
@@ -6921,7 +6922,7 @@ var PIANCHANG_DD = (function () {
       m.opened = true; ok = true; amt = m.amount; who = m.senderName || '';
       C.addLedger(s, 'ddIn', amt, APP + '收款：' + who + (m.note ? '（' + m.note + '）' : ''));
       pushMsgs(s, id, [Object.assign({ id: mid(), sender: 'user', senderName: who, kind: 'claim', text: '' }, stamp(s))], true);
-      s.dd.q[id] = (Number(s.dd.q[id]) || 0) + 1;
+      if (Number(s.dd.q[id]) > 0) s.dd.q[id] = Number(s.dd.q[id]) + 1;   // 待发是按「最后 N 条」数的：前面攒着话，收款行排在它们后面，得一起算进去
     });
     if (!ok) return;
     C.toast('success', '收了 ' + who + ' 的转账 ' + money(amt) + '，进账本了');
