@@ -11701,9 +11701,9 @@ var PIANCHANG_ONLINE = (function () {
     // 面板外壳：电脑
     P + '{position:fixed;z-index:31001;display:none;left:50%;top:50%;transform:translate(-50%,-50%);width:min(1120px,calc(100vw - 40px));height:min(820px,calc(100vh - 40px));',
     '  background:var(--pc-paper);color:var(--pc-ink);border-radius:12px;box-shadow:var(--pc-shadow);overflow:hidden;font-size:15px;line-height:1.6;border:1px solid #000;',
-    '  grid-template-columns:176px 1fr;grid-template-rows:64px 1fr;grid-template-areas:"head head" "nav main";}',
+    '  grid-template-columns:176px minmax(0,1fr);grid-template-rows:64px 1fr;grid-template-areas:"head head" "nav main";}',
     P + '.open{display:grid;}',
-    P + '.noid{grid-template-columns:1fr;grid-template-rows:64px 1fr;grid-template-areas:"head" "main";}',
+    P + '.noid{grid-template-columns:minmax(0,1fr);grid-template-rows:64px 1fr;grid-template-areas:"head" "main";}',
     P + ' .pc-head{grid-area:head;position:relative;display:flex;align-items:center;gap:10px;padding:8px 10px 0 20px;border-bottom:1px solid var(--pc-line);background:#1a1815;}',
     P + '.f-dir .pc-head::before{content:"";position:absolute;left:0;right:0;top:0;height:8px;background:repeating-linear-gradient(-55deg,#0e0e0e 0 14px,#f1ece2 14px 28px);}',
     P + '.f-act .pc-head::before{content:"";position:absolute;left:0;right:0;top:0;height:12px;background:radial-gradient(circle at 13px 5px,#fff3d1 0 2.5px,rgba(255,206,120,.55) 3.5px,rgba(255,190,90,.12) 7px,transparent 9px) 0 0/26px 12px repeat-x,#141210;}',
@@ -11905,7 +11905,7 @@ var PIANCHANG_ONLINE = (function () {
     '@media (max-width:899px){',
     // 宽高写死成视口大小：酒馆手机版 <html> 带 transform，fixed 的参照变成 html，height:auto 会塌成 0（社长室 10-17 真酒馆实测）
     '  ' + P + '{left:0;top:0;right:auto;bottom:auto;width:100vw;height:100vh;height:100dvh;transform:none;border-radius:0;border:0;font-size:15.5px;',
-    '    grid-template-columns:1fr;grid-template-rows:58px 1fr calc(60px + env(safe-area-inset-bottom,0px));grid-template-areas:"head" "main" "nav";}',
+    '    grid-template-columns:minmax(0,1fr);grid-template-rows:58px 1fr calc(60px + env(safe-area-inset-bottom,0px));grid-template-areas:"head" "main" "nav";}',
     '  ' + P + '.noid{grid-template-rows:58px 1fr;}',
     '  ' + P + ' .pc-head{padding:8px 4px 0 12px;gap:6px;}',
     '  ' + P + ' .pc-logo{font-size:15px;letter-spacing:.04em;}',
@@ -12034,6 +12034,13 @@ var PIANCHANG_ONLINE = (function () {
     '  ' + P + ' .pc-row .bd>.rn:first-child{margin-top:0;}',
     '  ' + P + ' .pc-row .rt{grid-column:1 / -1;grid-row:3;flex-direction:row;}',
     '  ' + P + ' .pc-row .rt .btn{flex:1;}',
+    '}',
+    // v0.1.51（源氏·巧巧巧「排版不对劲，页面展示不全」）：v0.1.50 顶栏多了 👤，男优部带艺名那行比手机屏宽，整块面板被撑出去一截。窄屏上图标按钮再收一点，挤不下就省略 logo
+    '@media (max-width:420px){',
+    '  ' + P + ' .pc-head{gap:2px;padding-right:2px;}',
+    '  ' + P + ' .pc-ibtn{width:30px;font-size:18px;}',
+    '  ' + P + ' .pc-logo{font-size:14px;}',
+    '  ' + P + ' .pc-money{padding:0 7px;}',
     '}',
   ].join('\n');
 
