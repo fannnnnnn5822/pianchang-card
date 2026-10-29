@@ -3214,16 +3214,62 @@ var PIANCHANG_CORE = (function () {
   var CAND_FROM_RETRY = '\n\n（上一次的格式没对上。这次每行一项，分别以 性别| 年龄| 外形| 入行前| 为什么来| 人话| 自我介绍| 面试| 开头。）';
   function buildCandFromPrompt(c, ev, o) {
     ev = ev || {}; o = o || {};
-    var U = o.who || '社长', studio = o.studio || L.studio || '银星映像', rec = [];
-    var sys = '你在帮片商「' + studio + '」补一位来面试的女优的档案（参考日本的架空世界，人名用中文名，全员成年）。她不是随机来的：' + U + '在正文里认识了她、在叮叮上加了好友，现在约她来面试，名字已经定了，叫「' + c.realName + '」。代码给她抽了一份档案格子，下面另附正文、叮叮和世界书里关于她的记录。' +
-      '记录里写过的事（年龄、长相、做什么的、经历、脾气、跟' + U + '的来往）以记录为准，格子跟记录对不上的那几格照记录改；记录没提到的，照格子写。';
+    if (o.pure && ev.own) return buildOwnPurePrompt(c, ev, o);   // v0.1.48 SENA 老师那种：直接用，不抽签
+    var U = o.who || '社长', studio = o.studio || L.studio || '银星映像', rec = [], own = String(ev.own || '').trim();
+    var sys = own
+      // v0.1.48 带自己的人来：玩家从别的世界书、角色卡挑来或者贴进来的一份设定，原样交给编剧，设定写过的都以设定为准
+      ? '你在帮片商「' + studio + '」补一位来面试的女优的档案（参考日本的架空世界，全员成年）。她是' + U + '自己带来的人：玩家给了她一份现成的设定' + (o.from ? '（' + o.from + '）' : '') + '，名字已经定了，叫「' + c.realName + '」。代码给她抽了一份档案格子。' +
+        '设定里写过的事（年龄、长相、身材、做什么的、经历、拍过的片、脾气、说话、床上、喜欢的和不碰的）以设定为准，格子跟设定对不上的那几格照设定改；设定没提到的，照格子写。设定里她原本不是做这一行的，就照她的处境和性子写她为什么肯来面试；设定里她不满 18 岁，就写成年以后的她。'
+      : '你在帮片商「' + studio + '」补一位来面试的女优的档案（参考日本的架空世界，人名用中文名，全员成年）。她不是随机来的：' + U + '在正文里认识了她、在叮叮上加了好友，现在约她来面试，名字已经定了，叫「' + c.realName + '」。代码给她抽了一份档案格子，下面另附正文、叮叮和世界书里关于她的记录。' +
+        '记录里写过的事（年龄、长相、做什么的、经历、脾气、跟' + U + '的来往）以记录为准，格子跟记录对不上的那几格照记录改；记录没提到的，照格子写。';
+    if (own) rec.push('【玩家给的她的设定（最准，一字不改照这个来）】\n' + own);
     if (ev.story) rec.push('【正文里写到她的段落】\n' + ev.story);
     if (ev.chat) rec.push('【她和' + U + '在叮叮上的聊天】\n' + ev.chat);
     if (ev.wb) rec.push('【世界书里她的条目】\n' + ev.wb);
     var user = '【她的名字】' + c.realName + '（定了，照这个写）\n【抽到的档案格子】\n' + candLines(c, !!o.low).slice(1).join('\n') + '\n\n' +
       (rec.length ? rec.join('\n\n') : '（正文和叮叮里关于她的记录很少：照格子写，名字照上面的。）') + '\n\n' +
-      '【请按这个格式回：每行一项，行首写项目名，用竖线隔开】\n' + CAND_FROM_FMT.replace(/\{U\}/g, U) + (rec.length ? candFromMore(c, !!o.low) : '') + '\n' + CAND_RULES.replace(/- 档案里写着她是看了哪份招聘来的[^\n]*\n/, '') + '\n只输出这几行。';
+      '【请按这个格式回：每行一项，行首写项目名，用竖线隔开】\n' + (own ? CAND_FROM_FMT.replace('接着记录里她和{U}的来往写', '照设定里她原本的处境和性子写').replace(/记录/g, '设定') : CAND_FROM_FMT).replace(/\{U\}/g, U) +
+      (rec.length ? (own ? candFromMore(c, !!o.low).replace(/记录/g, '设定') + OWN_TIER : candFromMore(c, !!o.low)) : '') + '\n' + CAND_RULES.replace(/- 档案里写着她是看了哪份招聘来的[^\n]*\n/, '') + '\n只输出这几行。';
     return { sys: sys, user: user };
+  }
+  // v0.1.48 带自己的人来：别的世界书条目 / 角色卡 / 玩家贴的一段设定，原样收下，只把空行压一压；太长的截在 OWN_MAX 字（面试、试戏、叮叮都整段带着）
+  var OWN_MAX = 12000;
+  // v0.1.48 SENA 老师那种（整本名册是现成的设定；Fan：「SENA老师的直接用 不抽签 因为和我们没关系」）：出处是他的书 / 卡，或者贴进来的就是他那套格式（数值系统满分 500）
+  var OWN_PURE_SRC = /av女优(天国|后宫)/i, OWN_PURE_TXT = /数值系统（满分\s*500）|AV女优生涯数值系统|power_stats\s*[:：]/;
+  function ownPure(from, text) { return OWN_PURE_SRC.test(String(from || '')) || OWN_PURE_TXT.test(String(text || '')); }
+  // 直接用：抽好的格子全拿掉（只留 id、立绘号），档案只照设定填；设定没写的空着。经验、尺度、年龄先放一个固定的底（不抽），设定里写了就照设定改
+  function ownStrip(p) {
+    NC_KEYS.concat(['lookMore', 'grade', 'gradeKey', 'gradeText', 'phys', 'sense', 'react', 'talk', 'sig', 'fx', 'fgT', 'forScript', 'firstTime', 'arch', 'motiveKind']).forEach(function (k) { delete p[k]; });
+    p.look = ''; p.past = ''; p.motive = ''; p.hometown = ''; p.xp = []; p.ng = []; p.traits = []; p.tic = ''; delete p.lookReq;
+    var r = (L.rank || []).find(function (x) { return x.rank === 3; }) || (L.rank || [])[0] || { rank: 3, label: '' };
+    p.rank = r.rank; p.rankLabel = r.label; p.tier = TIERS[2] || p.tier; p.age = 25;
+    p.fee = filmFee(p.rank, p.tier); p.signFee = Number((E.signFee || [])[p.rank]) || 0;
+    return p;
+  }
+  var PURE_FMT = '性别|女 或 男（照设定写）\n年龄|数字（照设定；设定里不满 18 岁就写成年以后的她）\n外形|一两句（照设定里的长相、身材写）\n入行前|一句（照设定）\n为什么来|一句（她为什么肯来面试：照设定里她的处境和性子写）\n人话|一句话，30 字以内：她缺什么、想要什么（照设定）\n自我介绍|两三句，她自己的口吻\n面试|{U}问「为什么来」，她答的一句\n';
+  function buildOwnPurePrompt(c, ev, o) {
+    var U = o.who || '社长', studio = o.studio || L.studio || '银星映像', no = '设定里没写就写「无」';
+    var sys = '你在帮片商「' + studio + '」给一位来面试的女优立档案（参考日本的架空世界，全员成年）。她是' + U + '自己带来的人，玩家给了她一份现成的设定' + (o.from ? '（' + o.from + '）' : '') + '，名字已经定了，叫「' + c.realName + '」。' +
+      '档案的每一格都只照这份设定写；设定里没写到的那一格写「无」，不要自己编、不要补。人话、自我介绍、面试那句照她设定里的性子和说话方式写。';
+    var more = '经验|她拍过多少、红不红，从这几档里挑一个照抄：' + (L.rank || []).map(function (r) { return r.label; }).join(' / ') + '；' + no + '\n' +
+      '组里说她|她在片场好不好拍，从这几档里挑一个照抄：' + (FG.grade || []).map(function (g) { return g.name + '（' + g.t + '）'; }).join(' / ') + '；' + no + '\n' +
+      OWN_TIER.replace('设定没写就写「照格子」', no) + '说话|她说话的样子，一句；' + no + '\n' +
+      (o.low ? '' : '体质|她身体上特别的地方，一句；' + no + '\n床上|她床上什么样，一句；' + no + '\nXP|她喜欢的，用；隔开；' + no + '\nNG|她不拍的，用；隔开；' + no + '\n');
+    var user = '【她的名字】' + c.realName + '（定了，照这个写）\n\n【她的设定（最准，一字不改照这个来）】\n' + String(ev.own).trim() +
+      (ev.story ? '\n\n【正文里写到她的段落】\n' + ev.story : '') + (ev.chat ? '\n\n【她和' + U + '在叮叮上的聊天】\n' + ev.chat : '') +
+      '\n\n【请按这个格式回：每行一项，行首写项目名，用竖线隔开】\n' + PURE_FMT.replace(/\{U\}/g, U) + more + '\n写法：不写借钱；全员成年。\n只输出这几行。';
+    return { sys: sys, user: user };
+  }
+  var OWN_TIER = '尺度|她能接的尺度，照设定从这几档里挑一个照抄：全年龄 / R15 / R18 常见XP / R18 BDSM / 深渊（设定里写着接 SM、凌辱、重口的往上挑，只拍普通床戏的挑 R18 常见XP）；设定没写就写「照格子」\n';
+  function ownText(t) {
+    t = String(t == null ? '' : t).replace(/\r\n?/g, '\n').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+    return t.length > OWN_MAX ? t.slice(0, OWN_MAX) + '\n（后面还有，太长没收）' : t;
+  }
+  // 条目标题、角色卡名里认出人名：「小野夕子 (Ono Yuko / おの ゆうこ)」「【女优】相泽南」「莲实克蕾雅 蓮実クレア」→ 取第一段中文名
+  function ownName(t) {
+    var s = String(t || '').replace(/【[^】]*】|\[[^\]]*\]/g, ' ').replace(/[（(][^）)]*[）)]?/g, ' ').trim();
+    var m = s.match(/[一-鿿々ー·・]{2,8}/); if (m) return m[0].replace(/[·・]+$/, '');
+    return s.split(/[\s/|，,、]+/)[0].slice(0, 8);
   }
   // v0.1.39（crazyman2333：女优世界书里写着在大厂拍过不少片，约来面试却抽到「耗材王 · 全组干等她进状态」）：照一掷千金立档那套「归纳，不是发明」——
   //   有记录的人，经验、组里说她、体质、床上、说话、XP、NG 也照记录写（记录没提的写「照格子」，留着抽到的）。没记录的照旧全照格子
@@ -3238,9 +3284,11 @@ var PIANCHANG_CORE = (function () {
   }
   // 照记录改格子（pianchang.fillCandFrom 调）：经验改了片酬、签约金跟着换；体质 / 床上换了，档案钩子照剩下的格子重算。返回改了哪几格
   function applyRec(p, d) {
-    var got = [], ti = tierIdx(p.tier);
+    var got = [];
+    if (d.tier) { var tt = tierOf(d.tier); if (tt && tt !== p.tier) { p.tier = tt; p.fee = filmFee(p.rank, p.tier); got.push('tier'); } }   // v0.1.48 自己带来的人：尺度照设定
+    var ti = tierIdx(p.tier);
     if (d.rank) { var r = (L.rank || []).find(function (x) { return d.rank.indexOf(x.label) >= 0; }); if (r && r.rank !== p.rank) { p.rank = r.rank; p.rankLabel = r.label; p.fee = filmFee(p.rank, p.tier); p.signFee = Number((E.signFee || [])[p.rank]) || 0; got.push('rank'); } }
-    if (d.grade && p.grade) { var g = (FG.grade || []).find(function (x) { return d.grade.indexOf(x.name) >= 0; }); if (g && g.g !== p.gradeKey) { p.grade = g.name; p.gradeKey = g.g; p.gradeText = g.t; got.push('grade'); } }
+    if (d.grade && (p.grade || (p.own && p.own.pure))) { var g = (FG.grade || []).find(function (x) { return d.grade.indexOf(x.name) >= 0; }); if (g && g.g !== p.gradeKey) { p.grade = g.name; p.gradeKey = g.g; p.gradeText = g.t; got.push('grade'); } }
     ['phys', 'react', 'talk'].forEach(function (k) {
       if (!d[k] || (k !== 'talk' && ti < 1)) return;
       p[k] = clip(d[k], 40); p.fgT = p.fgT || {}; p.fgT[k] = k === 'talk' ? (NC_ADULT && NC_ADULT.test(p[k]) ? Math.max(1, ti) : 0) : ti; got.push(k);
@@ -3254,6 +3302,8 @@ var PIANCHANG_CORE = (function () {
     if (got.length) p.rec = got;
     return got;
   }
+  // 模型写的尺度 → 档位名（「R18常见XP」「BDSM」「重口深渊」都认）
+  function tierOf(t) { t = String(t || '').replace(/\s+/g, ''); var i = /深渊/.test(t) ? 4 : /SM/i.test(t) ? 3 : /R18|常见/i.test(t) ? 2 : /R15/i.test(t) ? 1 : /全年龄/.test(t) ? 0 : -1; return i >= 0 ? TIERS[i] || '' : ''; }
   // 档案钩子（c.fx）照她身上还留着的抽签格子重算：照记录换掉的那格，钩子跟着没了
   function refx(p) {
     var fx = {};
@@ -3264,19 +3314,19 @@ var PIANCHANG_CORE = (function () {
     if (Object.keys(fx).length) p.fx = fx; else delete p.fx;
   }
   var FROM_KEY = { '性别': 'sex', '年龄': 'age', '外形': 'look', '入行前': 'past', '为什么来': 'motive', '人话': 'want', '本事': 'skill', '卡在哪': 'stuck', '自我介绍': 'intro', '面试': 'answer',
-    '经验': 'rank', '组里说她': 'grade', '说话': 'talk', '体质': 'phys', '床上': 'react', 'XP': 'xp', 'NG': 'ng' };
+    '经验': 'rank', '组里说她': 'grade', '说话': 'talk', '体质': 'phys', '床上': 'react', 'XP': 'xp', 'NG': 'ng', '尺度': 'tier' };
   var FROM_SKIP = /^[（(]?\s*(照格子|同格子|跟格子一样|不变|没写|无|空|—+|-+)\s*[）)]?[。.]?$/;
   function parseCandFrom(raw) {
     var out = {}, last = null;
     cleanRaw(raw).split('\n').forEach(function (line) {
       var l = line.replace(/\*\*/g, '').replace(/^\s*(?:[-*•>]|\d+[.、)）])\s*/, '').trim(); if (!l) return;
-      var m = l.match(/^(性别|年龄|外形|入行前|为什么来|人话|本事|卡在哪|自我介绍|面试|经验|组里说她|说话|体质|床上|XP|NG)\s*[|｜:：]\s*(.*)$/i);
+      var m = l.match(/^(性别|年龄|外形|入行前|为什么来|人话|本事|卡在哪|自我介绍|面试|经验|组里说她|说话|体质|床上|XP|NG|尺度)\s*[|｜:：]\s*(.*)$/i);
       if (m) { last = FROM_KEY[/^(xp|ng)$/i.test(m[1]) ? m[1].toUpperCase() : m[1]]; out[last] = (out[last] ? out[last] + ' ' : '') + m[2].trim(); return; }
       if (last && last !== 'sex' && last !== 'age') out[last] += ' ' + l;
     });
     var sex = String(out.sex || ''), male = /男/.test(sex) && !/女/.test(sex), age = Number((String(out.age || '').match(/\d{2}/) || [])[0]);
     out.age = age >= 18 && age <= 60 ? age : 0;
-    ['look', 'past', 'motive', 'rank', 'grade', 'talk', 'phys', 'react', 'xp', 'ng'].forEach(function (k) { if (out[k] != null && (!String(out[k]).trim() || FROM_SKIP.test(String(out[k]).trim()) || /照格子/.test(out[k]))) delete out[k]; });
+    ['look', 'past', 'motive', 'rank', 'grade', 'talk', 'phys', 'react', 'xp', 'ng', 'tier'].forEach(function (k) { if (out[k] != null && (!String(out[k]).trim() || FROM_SKIP.test(String(out[k]).trim()) || /照格子/.test(out[k]))) delete out[k]; });
     if (out.want) out.want = oneLine(out.want);
     var miss = ['want', 'intro'].filter(function (k) { return !out[k]; });
     return { ok: !male && !miss.length, male: male, data: out, miss: miss };
@@ -3308,6 +3358,7 @@ var PIANCHANG_CORE = (function () {
       if (p.tic) a.push('演戏时的小毛病（动作，不是口头禅）：' + p.tic);
     }
     if (g.intro) a.push('面试时的自我介绍：' + g.intro);
+    if (p.own && p.own.t) a.push('她自己的设定（玩家带来的，原样照录；跟上面几行对不上的地方以这段为准，年纪照上面的 ' + (p.age || '') + ' 岁，她是成年人）：\n' + p.own.t);   // v0.1.48
     var sx = p.sec && p.sec.s2 ? secEntry(p.sec) : null;   // v0.1.40 暗线：她亲口说过的，请她聊聊、试戏、叮叮里她都记得；没说之前一个字都不进
     if (sx && (!low || !(Number(sx.ti) > 0))) a.push('她跟 {{user}} 说过：' + sx.n2);
     return a;
@@ -3629,7 +3680,7 @@ var PIANCHANG_CORE = (function () {
     poseFamily: poseFamily, POSE_CAM: POSE_CAM, poseCamLines: poseCamLines, scenePoses: scenePoses, drawPoses: drawPoses, tagNames: tagNames, fixTags: fixTags, isPovSc: isPovSc, POV: POV, povOf: povOf, tagFix: tagFix, headForShoot: headForShoot, ncKey: ncKey, NC_RECENT: NC_RECENT,
     STYLE_JA: STYLE_JA, STYLE_JA_POV: STYLE_JA_POV, MULTI_RULES: MULTI_RULES, scFilterOk: scFilterOk, scFilterOn: scFilterOn, scFilterBar: scFilterBar, scFilterClick: scFilterClick,
     buildStep1: buildStep1, buildStep2: buildStep2, STEP1_RETRY: STEP1_RETRY, STEP1_ROLE_RETRY: STEP1_ROLE_RETRY, rolesOk: rolesOk, rolesLine: rolesLine, STEP2_RETRY: STEP2_RETRY,
-    parseScript: parseScript, parseScene: parseScene, mergeScene: mergeScene, scriptSane: scriptSane, pickMishapScene: pickMishapScene, parseRoles: parseRoles, scriptAllText: scriptAllText, makeIdea: makeIdea, ideaEmpty: ideaEmpty, ideaText: ideaText, ideaLineup: ideaLineup, draftLineup: draftLineup, draftPov: draftPov, floorDraft: floorDraft, walletScan: walletScan, walletStrip: walletStrip, applyRec: applyRec, candFromMore: candFromMore, SECRETS: SECRETS, SEC_ID: SEC_ID, SEC_KIND: SEC_KIND, SEC_CAST0: SEC_CAST0, SEC_N2: SEC_N2, SEC_GEN_RETRY: SEC_GEN_RETRY, pickSecret: pickSecret, newSec: newSec, secEntry: secEntry, secStage: secStage, secHint: secHint, secKw: secKw, secScan: secScan, secStrip: secStrip, secText: secText, secRng: secRng, buildSecGen: buildSecGen, parseSecGen: parseSecGen, signScan: signScan, signStrip: signStrip,ideaTier: ideaTier, applyIdea: applyIdea, ideaUnused: ideaUnused, markIdea: markIdea, lineCore: lineCore, cleanRaw: cleanRaw, sgFailKind: sgFailKind, failText: failText,
+    parseScript: parseScript, parseScene: parseScene, mergeScene: mergeScene, scriptSane: scriptSane, pickMishapScene: pickMishapScene, parseRoles: parseRoles, scriptAllText: scriptAllText, makeIdea: makeIdea, ideaEmpty: ideaEmpty, ideaText: ideaText, ideaLineup: ideaLineup, draftLineup: draftLineup, draftPov: draftPov, floorDraft: floorDraft, walletScan: walletScan, walletStrip: walletStrip, ownText: ownText, ownName: ownName, OWN_MAX: OWN_MAX, applyRec: applyRec, refx: refx, tierOf: tierOf, ownPure: ownPure, ownStrip: ownStrip, candFromMore: candFromMore, SECRETS: SECRETS, SEC_ID: SEC_ID, SEC_KIND: SEC_KIND, SEC_CAST0: SEC_CAST0, SEC_N2: SEC_N2, SEC_GEN_RETRY: SEC_GEN_RETRY, pickSecret: pickSecret, newSec: newSec, secEntry: secEntry, secStage: secStage, secHint: secHint, secKw: secKw, secScan: secScan, secStrip: secStrip, secText: secText, secRng: secRng, buildSecGen: buildSecGen, parseSecGen: parseSecGen, signScan: signScan, signStrip: signStrip,ideaTier: ideaTier, applyIdea: applyIdea, ideaUnused: ideaUnused, markIdea: markIdea, lineCore: lineCore, cleanRaw: cleanRaw, sgFailKind: sgFailKind, failText: failText,
     markPlayer: markPlayer, castLine: castLine, shootPrompt: shootPrompt, softPose: softPose, softLines: softLines, doneLine: doneLine, statusPrompt: statusPrompt, parseStatus: parseStatus,
     PORTRAIT_N: PORTRAIT_N, PORTRAIT_BASE: PORTRAIT_BASE, portraitOk: portraitOk, portraitUrl: portraitUrl, pickPortrait: pickPortrait, fillPortraits: fillPortraits,
     drawMan: drawMan, drawMen: drawMen, manLines: manLines, gradeLine: gradeLine, drawCand: drawCand, drawCands: drawCands, drawTraits: drawTraits, drawSpice: drawSpice, spicePool: spicePool, drawLook: drawLook, portraitFit: portraitFit, pickPortraitFor: pickPortraitFor, reqOfText: reqOfText, archOf: archOf, NC_LAYERS: NC_LAYERS, NC_KEYS: NC_KEYS, NC_LABEL: NC_LABEL, ncLines: ncLines, candLines: candLines, npcFaces: npcFaces, drawXP: drawXP, drawNG: drawNG, filmFee: filmFee, buildCandPrompt: buildCandPrompt, CAND_RETRY: CAND_RETRY, parseCands: parseCands, buildCandFromPrompt: buildCandFromPrompt, parseCandFrom: parseCandFrom, CAND_FROM_RETRY: CAND_FROM_RETRY, parseCandOne: parseCandOne, personLines: personLines,
@@ -3695,7 +3746,7 @@ var PIANCHANG_PROFILE = (function () {
   function textOf(p) {   // 她身上所有能认关键词的字
     var g = p.gen || {};
     return [p.look, p.past, p.motive, p.line, p.stuck, p.family, p.event, p.item, p.habit, p.entrance, p.need, p.main, p.base,
-      g.want, g.stuck, g.skill, arr(p.xp).join(' '), arr(p.traits).join(' '), arr(p.ng).join(' '), p.phys, p.sense, p.react].filter(Boolean).join(' ');
+      g.want, g.stuck, g.skill, arr(p.xp).join(' '), arr(p.traits).join(' '), arr(p.ng).join(' '), p.phys, p.sense, p.react, p.own && p.own.t].filter(Boolean).join(' ');   // v0.1.48 自己带来的人：她那份设定也认
   }
   var NPC_IDS = {}; arr(L.cast0).forEach(function (c) { NPC_IDS[c.id] = 1; });
   var ACTOR_NAMES = arr(L.actors).map(function (a) { return a.name; });
@@ -3766,7 +3817,8 @@ var PIANCHANG_PROFILE = (function () {
     var bd = /健身|体操|瑜伽|舞娘|舞者|跳舞|运动员|教练/.test(t) ? '紧实' : h >= 168 && r() < 0.6 ? '高挑'
       : rpickW(r, [['娇小', h < 156 ? 4 : 1], ['纤细', 3], ['匀称', 4], ['丰满', 3], ['肉感', 2]]);
     var big = /天然的大胸|大胸|巨乳|爆乳/.test(t), done = /胸是做的|隆过|做过胸/.test(t);
-    var ci = big ? rint(r, 5, 7) : bd === '娇小' || bd === '纤细' ? rpickW(r, [[0, 2], [1, 4], [2, 3], [3, 1]]) : bd === '丰满' || bd === '肉感' ? rpickW(r, [[3, 3], [4, 3], [5, 2], [6, 1]]) : rpickW(r, [[1, 2], [2, 4], [3, 3], [4, 1]]);
+    var cupM = t.match(/(?:^|[^A-Za-z])([A-Z])\s*[-－]?\s*(?:罩杯|罩|杯|[Cc][Uu][Pp])/), cupW = cupM ? 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.indexOf(cupM[1]) : -1;   // v0.1.48：设定里写明了几杯（「K杯」「C罩杯」「E-cup」）就照写的，H 以上算 H
+    var ci = cupW >= 0 ? Math.min(7, cupW) : big ? rint(r, 5, 7) : bd === '娇小' || bd === '纤细' ? rpickW(r, [[0, 2], [1, 4], [2, 3], [3, 1]]) : bd === '丰满' || bd === '肉感' ? rpickW(r, [[3, 3], [4, 3], [5, 2], [6, 1]]) : rpickW(r, [[1, 2], [2, 4], [3, 3], [4, 1]]);
     if (done) ci = Math.max(ci, 4);
     var bs = done ? '做过的，形状挺，手感偏硬' : ci <= 1 ? rpick(r, ['小巧，贴身', '挺，尖尖的', '圆，一手握得住']) : ci <= 4 ? rpick(r, ['圆润', '水滴形', '挺翘', '偏外扩', '软，弹']) : rpick(r, ['沉，有分量', '软，躺下会往两边摊', '水滴形，下缘饱满']);
     var deeper = age >= 31 ? 1 : 0;
@@ -3783,7 +3835,7 @@ var PIANCHANG_PROFILE = (function () {
       : hy ? '单身' : rpickW(r, [['单身', 7], ['有男友', 2], ['离了', age >= 27 ? 1 : 0]]);
     var dt = hy ? (r() < 0.5 ? 0 : 1) : Math.max(lv === '单身' ? 0 : 1, Math.min(p0, 1 + Math.floor(r() * 4)));
     var age0 = 18 + Math.floor(r() * Math.max(1, Math.min(6, age - 17)));
-    var nob = /后面不碰|后面.{0,4}(不碰|NG|不进)|肛.{0,4}(NG|不接)/.test(arr(p.xp).concat(arr(p.ng), arr(p.traits)).join(' ')) ? 1 : 0;
+    var nob = /后面不碰|后面.{0,4}(不碰|NG|不进)|肛.{0,4}(NG|不接)/.test(arr(p.xp).concat(arr(p.ng), arr(p.traits)).join(' ')) || arr(p.ng).some(function (x) { return /肛|后面|后穴/.test(x); }) ? 1 : 0;   // v0.1.48：NG 里写着「肛交」也算
     var db = '';
     if (xr >= 2) {
       var titles = arr(L.rivalTitles).filter(function (x) { return !/学|校|教|童贞/.test(x); }); if (!titles.length) titles = ['新人出道', '第一次进棚'];   // 出道作片名不带校园
@@ -3799,6 +3851,7 @@ var PIANCHANG_PROFILE = (function () {
       lv: lv, dt: dt, p0: p0, fn: fnPrior, pf: pf, f0: hy ? '' : age0 + ' 岁，和' + rpick(r, FIRST_WHO), db: db,
       _ad: nob ? 0 : xr >= 3 && ti >= 3 ? rint(r, 1, 4) : xr >= 3 ? rint(r, 0, 2) : 0,
       lac: fx.lac ? 1 : 0, sp: str(fx.sp),   // v0.1.33：会出奶 / 特殊构造（体检那天才知道）
+      oh: heightFrom(t) ? 1 : 0, oc: cupW >= 0 ? 1 : 0,   // v0.1.48：身高、罩杯是照她的设定写的（不是抽的）
     };
   }
   // v0.1.33 女优古怪特质（core.drawFem 抽的，钩子在 p.fx）：评级定死 / 至少 / 至多。层层绞杀器 → SS 名器；性冷淡 → 不到 A
@@ -3869,6 +3922,7 @@ var PIANCHANG_PROFILE = (function () {
   }
   function examSheet(p) {
     var b = p.body; if (!b) return [];
+    if (p.own && p.own.pure) return ['体检表 · ' + (p.stageName || p.realName || '') + '（' + md(b.ex || b.at) + '）'].concat([b.oh ? '身高 ' + b.h : '', b.oc ? b.cup + ' 杯' : ''].filter(Boolean).length ? [[b.oh ? '身高 ' + b.h : '', b.oc ? b.cup + ' 杯' : ''].filter(Boolean).join(' · ')] : []).concat(['其余照她自己的设定']);   // v0.1.48
     return [
       '体检表 · ' + (p.stageName || p.realName || '') + '（' + md(b.ex || b.at) + '）',
       '身高 ' + b.h + ' · ' + b.bd + ' · ' + b.cup + ' 杯',
@@ -4044,6 +4098,7 @@ var PIANCHANG_PROFILE = (function () {
   function injectLines(p, day, low) {
     if (!p || !p.body || !examined(p)) return [];
     var b = p.body, x = p.sex || {}, nm = p.stageName || p.realName || '她';
+    if (p.own && p.own.pure) return pureLines(p, day, low);   // v0.1.48 照设定直接用的人：抽出来的身体细节不发，身体照她自己的设定写
     if (low) {
       var t0 = softToday(p, day), out = ['【她现在】' + nm + '（' + (p.realName || '') + '，' + (p.age || '') + '）：' + b.h + '，' + b.bd + '；' + b.cup + ' 杯'];
       if (t0.length) out.push('- 今天：' + t0.join('；'));
@@ -4071,6 +4126,22 @@ var PIANCHANG_PROFILE = (function () {
     var st = arr(x.st).slice(-2);
     if (st.length) lines.push('- 最近：' + st.map(function (e) { return md(e.d) + ' ' + e.t; }).join('；'));
     return lines.slice(0, 7);
+  }
+  // v0.1.48 照设定直接用的人（SENA 老师的名册）：只发设定里写过的身高、罩杯，和拍出来的事（今天的状态、入行后的对手、作品、最近）
+  function pureLines(p, day, low) {
+    var b = p.body, x = p.sex || {}, nm = p.stageName || p.realName || '她', fig = [b.oh ? b.h + ' 厘米' : '', b.oc ? b.cup + ' 杯' : ''].filter(Boolean);
+    var lines = ['【她现在】' + nm + '（' + (p.realName || '') + '，' + (p.age || '') + '）：身体照她自己的设定写' + (fig.length ? '（' + fig.join('，') + '）' : '')];
+    var today = low ? softToday(p, day) : [], pn = periodNote(p, day), vn = vulvaNow(p, day), an = anusNow(p, day);
+    if (!low) { if (pn) today.push(pn); if (vn.sw) today.push(vn.t); if (an.now) today.push('后面' + an.now); }
+    if (today.length) lines.push('- 今天：' + today.join('；'));
+    if (low) return lines;
+    var fg = [p.phys && '体质：' + p.phys, p.react && '床上：' + p.react].filter(Boolean);
+    if (fg.length) lines.push('- ' + fg.join('；'));
+    var after = arr(x.ps);
+    lines.push('- 在这儿拍过 ' + arr(p.films).length + ' 部' + (after.length ? '；入行后的对手：' + after.slice(-4).join('、') + (after.length > 4 ? '等' : '') : ''));
+    var st = arr(x.st).slice(-2);
+    if (st.length) lines.push('- 最近：' + st.map(function (e) { return md(e.d) + ' ' + e.t; }).join('；'));
+    return lines;
   }
   // 谁在场：fixed 是一定在场的 id（正在拍、挂着的那一场），texts 是最近两楼正文 + 输入框里的字。最多三个
   function present(cast, opts) {
@@ -4181,7 +4252,7 @@ var PIANCHANG_PROFILE = (function () {
       g.want ? row('心里话', esc(g.want), 'long') : '', p.motive ? row('为什么来', esc(p.motive), 'long') : '', p.line ? row('一句话', esc(p.line), 'long') : '',
       (p.stuck || g.stuck) ? row('卡在哪', esc(p.stuck || g.stuck), 'long') : '', p.past ? row('入行前', esc(p.past), 'long') : '', p.family ? row('家里', esc(p.family), 'long') : '',
     ].join('');
-    var secret = examined(p) ? [
+    var secret = examined(p) && p.own && p.own.pure ? [row('身体', esc('照她自己的设定'), 'long'), b.oc ? row('胸部', esc(b.cup + ' 杯')) : '', row('后穴', esc(anusNow(p, day).lvl))].join('') : examined(p) ? [
       row('恋爱状态', esc(b.lv)), row('胸部', esc(b.cup + ' 杯 · ' + b.bs.split('，')[0])), row('私处', tone(b.vc) + '<small>' + esc(b.vs.split('，')[0]) + '</small>'),
       row('评级', rankBadge(p), 'rank'), row('后穴', esc(anusNow(p, day).lvl)), row('往事', esc(clip(p.event || '没说过', 40)), 'long'),   // v0.1.40：这一行显示的一直是「一件往事」，暗线另起「你注意到的」
     ].join('') : lockedBox();
@@ -4203,6 +4274,7 @@ var PIANCHANG_PROFILE = (function () {
   }
   function bodyTab(p, day) {
     if (!examined(p)) return lockedBox();
+    if (p.own && p.own.pure) return pureBodyTab(p, day);   // v0.1.48
     var b = p.body, ds = b.ds || {}, c = cycleOf(p, day), vn = vulvaNow(p, day), an = anusNow(p, day), pb = pubicNow(p, day);
     var fig = [
       row('身高 · 体型', esc(b.h + ' 厘米 · ' + b.bd)), row('胸部', esc(b.cup + ' 杯，' + b.bs)), row('乳晕', tone(b.nc) + '<small>' + esc(b.ar) + '</small>'),
@@ -4233,6 +4305,17 @@ var PIANCHANG_PROFILE = (function () {
       b.sp ? row('特殊', esc(b.sp), 'long') : '', b.lac ? row('出奶', esc('没在哺乳期，一激动就有'), 'long') : '', p.react ? row('床上', esc(p.react), 'long') : ''].join('');   // v0.1.33 古怪特质
     return '<div class="pcp-cols">' + sec('身材', '<div class="pcp-list">' + fig + '</div>') + (fgr ? sec('体质', '<div class="pcp-list">' + fgr + '</div>', 'pcp-secret') : '') + sec('私处', '<div class="pcp-list">' + vul + '</div>', 'pcp-secret') +
       sec('后面', '<div class="pcp-list">' + back + '</div>') + sec('周期', '<div class="pcp-list">' + cyc + '</div>') + sec('经历', '<div class="pcp-list">' + exp + '</div>') + '</div>';
+  }
+  // v0.1.48 照设定直接用的人：身体页只放设定里写过的身高、罩杯，和拍出来的事（现在的状态、周期、入行后）；别的照她自己的设定
+  function pureBodyTab(p, day) {
+    var b = p.body, c = cycleOf(p, day), vn = vulvaNow(p, day), an = anusNow(p, day), x = p.sex || {}, after = arr(x.ps).map(showName);
+    var fig = [b.oh ? row('身高', esc(b.h + ' 厘米')) : '', b.oc ? row('胸部', esc(b.cup + ' 杯')) : '', row('其余', esc('照她自己的设定'), 'long')].join('');
+    var now = [row('私处', vn.sw ? tone(vn.t, 'l6') : esc(vn.t)), an.now ? row('后面', an.sw ? tone(an.now, 'l6') : esc(an.now)) : ''].join('');
+    var cyc = [row('今天', '<span class="pcp-c' + (c.inPeriod ? ' pcp-t-l6' : '') + '">' + esc(c.label) + '</span>'), row(c.len + ' 天一轮', cycleBar(c), 'bar')].join('');
+    var exp = [row('入行后', esc(after.length ? after.slice(-8).join('、') + (after.length > 8 ? ' 等' : '') : '还没拍过'), 'long')].join('');
+    var fgr = [p.grade ? row('组里叫她', esc(p.grade), 'long') : '', p.phys ? row('体质', esc(p.phys), 'long') : '', p.react ? row('床上', esc(p.react), 'long') : ''].join('');
+    return '<div class="pcp-cols">' + sec('身材', '<div class="pcp-list">' + fig + '</div>') + (fgr ? sec('体质', '<div class="pcp-list">' + fgr + '</div>', 'pcp-secret') : '') + sec('现在', '<div class="pcp-list">' + now + '</div>', 'pcp-secret') +
+      sec('周期', '<div class="pcp-list">' + cyc + '</div>') + sec('经历', '<div class="pcp-list">' + exp + '</div>') + '</div>';
   }
   // 这部片她和谁拍的：片里别的女优标（女）；{{user}} 自己上的写「你」（第一视角片写「你（第一视角）」，镜头外拍的 f.self = 'obj' 也是你）
   function withOf(f, p, opts) {
@@ -5553,7 +5636,9 @@ var PIANCHANG_DD = (function () {
   }
   // 【npc】名 条目整段原样给（不截断）；条目里「事件示例」那段（以前叫「这阵子」）照样在里面，人设读取不挑小节名
   //   names 可以给好几个（艺名、本名、外号），先碰到哪个算哪个
-  async function wbNpc(name) {
+  // v0.1.48（crazyman2333「面试读世界书五次就成一次」；SENA 老师那种名册）：off＝关着的条目也认（约来面试查她的记录用；叮叮人设不读关着的）；
+  //   触发词写成一整串「雾岛遥，在职女优，巅峰期」的拆开认；标题以她名字开头、后面跟着罗马音日文名的（「雾岛遥 (Kirishima Haruka / …)」）也算标题里有她
+  async function wbNpc(name, off) {
     var es = await wbEntries(), want = (Array.isArray(name) ? name : [name]).map(function (x) { return String(x || '').trim(); }).filter(Boolean);
     if (want.indexOf(K_NICK) >= 0) want.push(K_NAME);
     for (var i = 0; i < es.length; i++) {
@@ -5564,11 +5649,12 @@ var PIANCHANG_DD = (function () {
     //   标题里有她的名字（「相泽南」「【女优】相泽南」「相泽南（FALENO）」），或者触发词里正好有她的名字；正文里也得提到她，免得认成一条只是拿她名字当触发词的事件
     var w2 = want.filter(function (x) { return x.length >= 2; }), best = null, bestS = 0;
     es.forEach(function (e) {
-      if (!e || e.enabled === false) return;
+      if (!e || (e.enabled === false && !off)) return;
       var t = String(e.name || e.comment || ''), body = String(e.content || ''), ks = ((e.strategy && e.strategy.keys) || e.key || e.keys || []);
+      var head = t.replace(/【[^】]*】/g, '').trim().split(/[\s(（/|｜,，]/)[0];   // 标题开头那一段
       w2.forEach(function (x) {
         if (body.indexOf(x) < 0) return;
-        var sc = t.replace(/[【】\[\]（）()「」·\s:：\-—_|｜]/g, '') === x ? 3 : (t.indexOf(x) >= 0 && t.length <= x.length + 12) ? 2 : (Array.isArray(ks) && ks.some(function (k) { return typeof k === 'string' && k.trim() === x; })) ? 1 : 0;
+        var sc = t.replace(/[【】\[\]（）()「」·\s:：\-—_|｜]/g, '') === x ? 3 : ((t.indexOf(x) >= 0 && t.length <= x.length + 12) || head === x) ? 2 : (Array.isArray(ks) && ks.some(function (k) { return typeof k === 'string' && k.split(/[，,、;；]/).some(function (y) { return y.trim() === x; }); })) ? 1 : 0;
         if (sc > bestS) { bestS = sc; best = body.trim(); }
       });
     });
@@ -5581,6 +5667,7 @@ var PIANCHANG_DD = (function () {
     var wb = await wbNpc(namesOf(c));   // 人设先从世界书拉
     if (c.kind === 'talent' || c.kind === 'met') {
       var r = c.ref; if (!r) return wb;
+      if (r.own && r.own.t) wb = '';   // v0.1.48 自己带来的人：她那份设定在档案里整段带着（personBlock），世界书里同名那条多半就是它，不再重复
       var intro = ''; try { intro = String((C.rosterIntro && C.rosterIntro(s, r)) || ''); } catch (e) { intro = ''; }
       var pb = []; try { pb = C.personBlock(r) || []; } catch (e) { pb = []; }
       return (intro ? intro + '\n' : '') + (wb ? wb + '\n' : '') + (Array.isArray(pb) ? pb.join('\n') : String(pb || ''));
@@ -5639,7 +5726,7 @@ var PIANCHANG_DD = (function () {
     var cut = spans.sort(function (x, y) { return x[0] - y[0]; }).map(function (x) { return story.slice(x[0], x[1]).replace(/\s*\n\s*/g, ' ').trim(); }).join('\n……\n');
     if (cut.length > 1500) cut = '…' + cut.slice(-1500);
     var chat = histText(hist(c.id, s).filter(function (m) { return m.kind !== 'invite'; }), 30, uc(s)); if (chat.length > 800) chat = '…' + chat.slice(-800);
-    var wb = await wbNpc(namesOf(c)); if (wb.length > 1500) wb = wb.slice(0, 1500) + '…';
+    var wb = await wbNpc(namesOf(c), true); if (wb.length > 6000) wb = wb.slice(0, 6000) + '…';   // v0.1.48：关着的条目也认；1500 字放到 6000（女优设定动辄三五千字，以前只读到开头的外形）
     return { story: cut, chat: chat, wb: wb };
   }
   // 最新一条 AI 楼的正文（洗过），判断谁「在场」用
@@ -6020,7 +6107,7 @@ var PIANCHANG_DD = (function () {
     R + ' .dd-go{height:38px;border-radius:10px;border:0;cursor:pointer;font:inherit;font-size:14px;color:var(--dd-on);background:var(--dd);}',
     R + ' .dd-go.tf{background:#e8833a;color:#fff;}',
     R + ' .dd-tip{font-size:11.5px;color:var(--pc-faint);}',
-    R + ' .dd-castbar{flex:none;display:flex;align-items:center;gap:8px;padding:6px 16px;border-bottom:1px solid var(--pc-line);background:var(--dd-soft);font-size:12.5px;color:var(--pc-sub);}',
+    R + ' .dd-castbar{flex:none;display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;padding:6px 16px;border-bottom:1px solid var(--pc-line);background:var(--dd-soft);font-size:12.5px;color:var(--pc-sub);}',
     R + ' .dd-castbar span{flex:1;min-width:0;}',
     R + ' .dd-castbar button{flex:none;border:1px solid var(--dd);background:var(--dd);color:var(--dd-on);border-radius:8px;padding:4px 10px;font:inherit;font-size:12.5px;font-weight:600;cursor:pointer;}',
     // 📞 通话屏（好大鱼老师《霖州》的样子：暗底、玻璃字幕、圆键）
@@ -6229,7 +6316,9 @@ var PIANCHANG_DD = (function () {
     var ci = null; try { ci = !c.group && C.castInfo ? C.castInfo(c, s) : null; } catch (e) { ci = null; }
     if (!ci) return '';
     if (ci.yx) return '<div class="dd-castbar" data-castbar="' + esc(c.id) + '"><span>她签在银星。想用她：借一部，或者挖过来</span><button data-x="castin">🎬 借 / 挖</button></div>';   // v0.1.38 社长线：银星的女优
-    return '<div class="dd-castbar" data-castbar="' + esc(c.id) + '"><span>' + (ci.pend ? esc(c.name) + ' 在面试间等着，签不签在选角页谈' : (c.kind === 'met' ? '面试过、还没签。' : '想签？') + '约来面试，签不签在选角页谈') + '</span><button data-x="castin">' + (ci.pend ? '去选角看看' : '📋 约来面试') + '</button></div>';
+    // v0.1.48（crazyman2333「叮叮直接签约成专属或单部女优」）：「签下」「一部」＝约来面试 + 谈好了（后台补档案，好了弹一条，点了起艺名签）
+    var deal = '<button data-x="castsign" data-deal="sign" title="不用等面试：档案补好了弹一条，点了起艺名签下">✍ 签下</button><button data-x="castsign" data-deal="one" title="只拍一部：不收签约金，片酬贵一半，拍完就走">只拍一部</button>';
+    return '<div class="dd-castbar" data-castbar="' + esc(c.id) + '"><span>' + (ci.pend ? esc(c.name) + ' 在面试间等着，签不签在选角页谈' : (c.kind === 'met' ? '面试过、还没签。' : '想签？') + '约来面试，或者直接签') + '</span><button data-x="castin">' + (ci.pend ? '去选角看看' : '📋 约来面试') + '</button>' + deal + '</div>';
   }
   function renderChat(id) {
     var s = st(), c = findChat(id, s);
@@ -7303,6 +7392,7 @@ var PIANCHANG_DD = (function () {
     else if (x === 'back') show('home');
     else if (x === 'face') { var fc = findChat(cur); if (fc && C.faceTap) C.faceTap(fc); }
     else if (x === 'castin') { var cc = findChat(cur); if (cc && C.castIn) C.castIn(cc); }   // v0.1.28 约来面试
+    else if (x === 'castsign') { var cs = findChat(cur), dl = b.getAttribute('data-deal') === 'one' ? 'one' : 'sign'; if (cs && C.castIn) { C.castIn(cs, { deal: dl, from: 'dd' }); C.toast('info', (cs.name || '她') + '：' + (dl === 'one' ? '只拍一部' : '签约') + '说好了。档案补好了会弹一条，点了起艺名'); } }   // v0.1.48
     else if (x === 'set') show('set');
     else if (x === 'set-tog') { var k = b.getAttribute('data-k'), o = {}; o[k] = cfg()[k] === false; saveCfg(o); renderSettings(); refreshInjection(); if (k === 'floor' && o[k]) startFloorObserver(); if (k === 'pretty') restyleFloor(); }
     else if (x === 'set-src') { saveCfg(Object.assign(readApiForm(), { source: b.getAttribute('data-v') })); renderSettings(); }
@@ -9550,12 +9640,18 @@ var PIANCHANG_ONLINE = (function () {
       var a = allMen(st).find(function (x) { return x.name === who; }); if (a) { lines.push(pf('maleLine', a, low) || ''); if (a.gradeKey) men.push(a); }   // v0.1.32 面试签下的男优没有世界书条目：档案另起一块
     });
     if (sh.gigId && identity(st) === '男优') { var b2 = selfBody(); if (b2) lines.push(pf('maleLine', { name: '{{user}}', custom: b2 }) || ''); }   // 男优线：坐男优位的就是 {{user}}
-    var fb = pf('injectBlock', fem, st.day, low) || '';
+    var fb = pf('injectBlock', fem, st.day, low) || '', ob = ownBlock(fem);
     lines = lines.filter(Boolean);
-    if (!fb && !lines.length) return '';
+    if (!fb && !lines.length && !ob) return '';
     var mb = men.map(function (a) { return '- ' + a.name + '（本名' + a.realName + '，' + a.age + ' 岁）：' + C.manLines(a).filter(function (x) { return !low || /^(说话|小动作|入行前|为什么来|卡在哪|家里)：/.test(x); }).join('；'); }).join('\n');   // NSFW 低档：涉性的几行不发
     return '【在场的人 · 身体】照这个写，不现编：\n' + (fb ? fb + '\n' : '') + lines.map(function (x) { return '- ' + x; }).join('\n') +
-      (mb ? '\n【男优档案】面试签下的男优，照这个演；抽到不搭的几条别解释，并排写：\n' + mb : '');
+      (mb ? '\n【男优档案】面试签下的男优，照这个演；抽到不搭的几条别解释，并排写：\n' + mb : '') + (ob ? '\n' + ob : '');
+  }
+  // v0.1.48 自己带来的人：在场 / 开拍时，她那份设定整段跟着她（玩家带她来就是想在正文里见到她）
+  function ownBlock(people) {
+    return arr(people).filter(function (p) { return p && p.own && p.own.t; }).map(function (p) {
+      return '【' + (p.stageName || p.realName || '她') + '自己的设定】（玩家带来的，原样照录；跟上面对不上的地方以这段为准；她现在 ' + (p.age || '') + ' 岁，成年了）\n' + p.own.t;
+    }).join('\n');
   }
   // 女优档案的在场注入（pianchang-talent，深度 1，system，不扫世界书）：挂着的那一场的人 + 最近两楼正文和输入框里点到名字的人，最多三个。
   // 正在拍的那部里的人已经并进 pianchang-shoot，这里不重复发。没有 profile.js 就什么都不做
@@ -9568,7 +9664,7 @@ var PIANCHANG_ONLINE = (function () {
     try { var n = lastId(); if (n >= 0) (getChatMessages(Math.max(0, n - 1) + '-' + n) || []).forEach(function (m) { if (m && m.message) texts.push(String(m.message)); }); } catch (e) {}
     try { var ta = DOC.getElementById('send_textarea'); if (ta && ta.value) texts.push(String(ta.value)); } catch (e) {}
     var people = (pf('present', st.dir.cast.filter(function (c) { return c && !skip[c.id]; }), { fixed: fixed, texts: texts }) || []);
-    return [pf('injectBlock', people, st.day, nsfwLow()) || '', secHintText(st, people)].filter(Boolean).join('\n');   // v0.1.40 暗线：在场的人里有一位该露了，接在她的档案后面
+    return [pf('injectBlock', people, st.day, nsfwLow()) || '', ownBlock(people), secHintText(st, people)].filter(Boolean).join('\n');   // v0.1.40 暗线：在场的人里有一位该露了，接在她的档案后面
   }
 
   // ═════════════ 暗线秘密（v0.1.40；挑哪条、哪一层、提示怎么写、暗号怎么认在 core.js「暗线秘密」那一节）═════════════
@@ -9577,7 +9673,7 @@ var PIANCHANG_ONLINE = (function () {
   //   暗号：正文 [暗线:艺名|1/2/帮/压]（secFloor，跟 [TIME] 排同一条队）；叮叮 (暗线|2/帮/压)（dingding 调 ctx.secChat）；钱类的秘密说过以后玩家在叮叮转账算帮（ctx.secPay）
   function secFill(s) { if (!C.SECRETS || !C.SECRETS.length) return; s.dir.cast.forEach(function (c) { if (c && !c.sec && !c.borrowed && !c.oneShot) secAssign(s, c, true); }); }
   function secAssign(s, c, seeded) {
-    if (!c || c.sec || c.borrowed || c.oneShot || !C.newSec) return;
+    if (!c || c.sec || c.borrowed || c.oneShot || !C.newSec || (c.own && c.own.pure)) return;   // v0.1.48 SENA 老师的人照设定直接用，不另挂我们的暗线
     var others = s.dir.cast.filter(function (x) { return x && x !== c && x.sec; });
     var sec = C.newSec(c, { idn: identity(s), used: others.map(function (x) { return x.sec.id; }), usedK: others.filter(function (x) { return x.sec.gen; }).map(function (x) { return x.sec.k; }), rnd: seeded ? C.secRng('sec|' + c.id) : null });
     if (!sec) return;
@@ -10475,7 +10571,7 @@ var PIANCHANG_ONLINE = (function () {
     }
     var used = st.dir.cast.map(function (c) { return (c.realName || '').charAt(0); });
     // 抽签池去重（v0.1.8）：这一批三个人不抽同一条；最近几批抽过的少抽（键存在 s.dir.ncSeen）
-    var keep = arr((curCasting(st) || {}).cands).filter(function (c) { return c && c.ddFrom && c.status !== 'loading'; });   // v0.1.28：叮叮约来的人不跟着这一批换掉
+    var keep = arr((curCasting(st) || {}).cands).filter(function (c) { return c && (c.ddFrom || c.own) && c.status !== 'loading'; });   // v0.1.28：叮叮约来的人不跟着这一批换掉
     var drawn = C.drawCands(3, used, st.dir.cast.concat(keep).map(function (c) { return c.portrait; }), cr ? cr.reqs : null, [].concat.apply([], arr(st.dir.ncSeen)));
     var seenKeys = drawn.keys || [];
     if (seenKeys.length) save(function (s) { s.dir.ncSeen = arr(s.dir.ncSeen).concat([seenKeys]).slice(-(C.NC_RECENT || 4)); });
@@ -10500,7 +10596,7 @@ var PIANCHANG_ONLINE = (function () {
   function persistCasting() { var snap = CUR ? clone(CUR) : null; if (snap) snap.busy = false; return save(function (s) { s.dir.cands = snap; }); }
   async function retryCand(id) {
     var c = CUR && CUR.cands.find(function (x) { return x.id === id; }); if (!c || CUR.busy) return;
-    if (c.ddFrom) { var dc = ddContactOf(c, readState()); c.status = 'loading'; CUR.busy = true; render(); return genCandFrom(c, dc, CUR); }   // v0.1.28：叮叮约来的人照她自己的记录重写，名字不换
+    if (c.ddFrom || c.own) { var dc = c.ddFrom ? ddContactOf(c, readState()) : ownContact(c); c.status = 'loading'; CUR.busy = true; render(); return genCandFrom(c, dc, CUR); }   // v0.1.48 自己带来的人也照她的设定重写   // v0.1.28：叮叮约来的人照她自己的记录重写，名字不换
     var mine = CUR;
     c.status = 'loading'; CUR.busy = true; render();
     try { var raw = await genAsk(C.buildCandPrompt([c], { low: nsfwLow() }), C.CAND_RETRY, 'pianchang-cast1-' + Date.now().toString(36)); if (CUR !== mine) return; var r = C.parseCands(raw, [c])[0]; if (r.ok) fillCand(c, r.data); else { c.status = 'error'; c.err = C.failText(C.sgFailKind(raw), '缺：' + r.miss.join('、')); } }
@@ -10516,7 +10612,7 @@ var PIANCHANG_ONLINE = (function () {
     if (st.money < sfee) { UI.modal = { kind: 'sign', id: id, err: moneyLabel(identity(st)) + '不够付签约金（' + money(sfee) + '）。' }; render(); return; }
     var r = { id: c.id, portrait: c.portrait, stageName: stage, realName: c.realName, age: c.age, hometown: c.hometown, look: c.look, past: c.past, motive: c.motive, motiveKind: c.motiveKind, rank: c.rank, rankLabel: c.rankLabel, tier: c.tier, fee: one ? oneFee(c) : c.fee, xp: c.xp, traits: c.traits || [], ng: c.ng, tic: c.tic, gen: c.gen, signedDay: st.day, films: [] };
     if (one) { r.oneShot = 1; r.baseFee = c.fee; r.signFee = c.signFee; }
-    C.NC_KEYS.concat(['pool', 'lookReq', 'lookMore', 'forScript', 'firstTime', 'grade', 'gradeKey', 'gradeText', 'phys', 'sense', 'react', 'talk', 'sig', 'fx', 'fgT']).forEach(function (k) { if (c[k]) r[k] = c[k]; });   // 抽签池那几层跟着签进卡司（请她聊聊、试戏、叮叮的人设都读）
+    C.NC_KEYS.concat(['pool', 'lookReq', 'lookMore', 'forScript', 'firstTime', 'grade', 'gradeKey', 'gradeText', 'phys', 'sense', 'react', 'talk', 'sig', 'fx', 'fgT', 'own']).forEach(function (k) { if (c[k]) r[k] = c[k]; });   // 抽签池那几层跟着签进卡司（请她聊聊、试戏、叮叮的人设都读）
     var sheet = [];
     await save(function (s) {
       sheet = pf('onSign', r, s.day, { studio: ourStudio(s) }) || [];   // 女优档案：签约当天抽身体设定、做体检，返回体检表几行
@@ -10569,7 +10665,7 @@ var PIANCHANG_ONLINE = (function () {
     o = o || {};
     var st = readState(), info = castInfo(c, st), deal = o.deal || ''; if (!info) return;
     if (deal && info.yx) { toast('info', '正文里跟' + c.name + '谈好了，可她签在银星：在「艺人」页「银星映像的女优」里借一部，或者挖过来'); return; }
-    if (deal && info.pend) { var pp = (curCasting(st) || { cands: [] }).cands.find(function (x) { return x && x.id === info.pend; }); if (pp) { pp.deal = deal; await persistCasting(); render(); if (pp.status === 'ok') dealToast(pp); } return; }
+    if (deal && info.pend) { var pp = (curCasting(st) || { cands: [] }).cands.find(function (x) { return x && x.id === info.pend; }); if (pp) { pp.deal = deal; if (o.from) pp.dealFrom = o.from; else delete pp.dealFrom; await persistCasting(); render(); if (pp.status === 'ok') dealToast(pp); } return; }
     if (info.yx) { UI.tab = 'cast'; lsSet(TAB_KEY, UI.tab); UI.modal = { kind: 'yx', id: info.yx }; if (!PANEL.classList.contains('open')) openPanel(); else render(); return; }   // v0.1.38
     if (info.pend) { goCand(info.pend); return; }
     var cur = curCasting(st);
@@ -10581,7 +10677,7 @@ var PIANCHANG_ONLINE = (function () {
     var met = info.met && arr(st.met).find(function (m) { return m && m.id === info.met; });
     if (met) {
       var mp = clone(met); delete mp.metDay; delete mp.err; mp.status = 'ok'; mp.ddFrom = c.id;
-      if (deal) { mp.deal = deal; cur.cands.unshift(mp); await persistCasting(); render(); dealToast(mp); return; }
+      if (deal) { mp.deal = deal; if (o.from) mp.dealFrom = o.from; cur.cands.unshift(mp); await persistCasting(); render(); dealToast(mp); return; }
       cur.cands.unshift(mp); await persistCasting(); goCand(mp.id);
       toast('success', (mp.realName || c.name) + ' 又来了一趟，在选角页等着：签不签照常谈'); return;
     }
@@ -10589,29 +10685,226 @@ var PIANCHANG_ONLINE = (function () {
     var d = C.drawCands(1, st.dir.cast.map(function (x) { return (x.realName || '').charAt(0); }), others.map(function (x) { return x.portrait; }), null, [].concat.apply([], arr(st.dir.ncSeen))), p = d[0];
     if (d.keys && d.keys.length) save(function (s) { s.dir.ncSeen = arr(s.dir.ncSeen).concat([d.keys]).slice(-(C.NC_RECENT || 4)); });
     p.surname = na[0] || ''; p.given = na.slice(1).join(''); p.realName = nm; p.ddFrom = c.id; p.status = 'loading';
-    if (deal) p.deal = deal;
+    if (deal) { p.deal = deal; if (o.from) p.dealFrom = o.from; }   // v0.1.48 叮叮里点「签下 / 只拍一部」：from = 'dd'
     cur.cands.unshift(p); cur.busy = true; if (deal) render(); else goCand(p.id);
     return genCandFrom(p, c, cur);
   }
   async function genCandFrom(p, c, mine) {
     var st = readState(), ev = null, raw = null, err = null, r = null;
     try { ev = DD && DD.castEvidence ? await DD.castEvidence(c) : null; } catch (e) { ev = null; }
+    if (p.own && p.own.t) { ev = Object.assign({}, ev || {}, { own: p.own.t }); delete ev.wb; }   // v0.1.48 自己带来的人：设定整段交给编剧，世界书里同名那条不再另附（多半就是同一条）
     for (var attempt = 0; attempt < 2; attempt++) {
       err = null;
-      try { raw = await genAsk(C.buildCandFromPrompt(p, ev || {}, { studio: ourStudio(st), who: identity(st) || '社长', low: nsfwLow() }), attempt ? C.CAND_FROM_RETRY : '', 'pianchang-castdd-' + Date.now().toString(36) + attempt); } catch (e) { err = e; }
+      try { raw = await genAsk(C.buildCandFromPrompt(p, ev || {}, { studio: ourStudio(st), who: identity(st) || '社长', low: nsfwLow(), from: p.own && p.own.f, pure: !!(p.own && p.own.pure) }), attempt ? C.CAND_FROM_RETRY : '', 'pianchang-castdd-' + Date.now().toString(36) + attempt); } catch (e) { err = e; }
       if (CUR !== mine) return;   // 切了聊天
       if (err && is429(err)) break;
       r = err ? null : C.parseCandFrom(raw); if (r && (r.ok || r.male)) break;
     }
     mine.busy = false;
-    if (r && r.male) { mine.cands = mine.cands.filter(function (x) { return x !== p; }); if (UI.hlCand === p.id) UI.hlCand = null; await persistCasting(); render(); toast('warning', '选角只招女优：' + p.realName + ' 是男的，约不来面试'); return; }
+    if (r && r.male) { mine.cands = mine.cands.filter(function (x) { return x !== p; }); if (UI.hlCand === p.id) UI.hlCand = null; await persistCasting(); render(); toast('warning', '选角只招女优：' + p.realName + (p.own ? ' 的设定是男的，请不来面试' : ' 是男的，约不来面试')); return; }
     if (r && r.ok) { fillCandFrom(p, r.data, st, mine); if (ev && ev.wb) p.recWb = 1; else delete p.recWb; } else { p.status = 'error'; p.err = err ? errMsg(err) : C.failText(C.sgFailKind(raw), r ? '缺：' + r.miss.join('、') : ''); }
     await persistCasting(); render();
     if (p.status === 'ok') { if (p.deal) dealToast(p); else toast('success', p.realName + ' 来了，在选角页等着：签不签照常谈'); }
   }
+  // ── 带自己的人来（v0.1.48，玩家最想要的「自己接入 NPC 女优」；Fan：一掷千金那个导入照抄 + 像小狸那样直接贴）──
+  //   世界书：搜书名 / 角色卡名（照一掷千金「请旧识过来」）→ 挑一本 → 挑书里的哪一条（几条也行，关着的也能挑）→ 条目原文一字不改当她的设定
+  //   角色卡本身：卡的描述、卡里自带的世界书（导卡时没点导入的也读得到）各算一条；从卡来的，头像用卡的头像
+  //   直接贴：一段人设贴进来，什么格式都行
+  //   她带着设定来面试（genCandFrom：格子照设定改，没写的才照抽签），签下以后设定跟着她：请她聊聊、试戏、叮叮整段带（core.personLines），体检照设定里写的身高、罩杯
+  //   SENA 老师《av女优天国3.0》：只认玩家酒馆里装的那本书，名册不进我们的卡（Fan 10-29：「这个我们只做接口」）
+  var OWN_SENA = '装了 SENA 老师《av女优天国3.0》的，搜「av」就能从他的女优名册里请人。名册里每一位的设定都出自 SENA 老师之手，原样照录；声色片场只负责开这扇门，谢谢 SENA 老师同意我们接上。';
+  function ownOpen() { UI.modal = { kind: 'own', tab: 'wb', q: '', res: null, book: null, entries: null, sel: [], name: '', auto: '', text: '', filter: '' }; render(); }
+  function ownRender() { if (UI.modal && UI.modal.kind === 'own') UI.modal.fresh = 1; render(); }   // 框里的字刚由程序改过（自动填名字、换书清筛子）：这次重画别再从旧输入框读回去
+  function ownKeep(m) {
+    m = m || UI.modal; if (!m || m.kind !== 'own') return;
+    [['name', '#pc-own-name'], ['text', '#pc-own-text'], ['q', '#pc-own-q'], ['filter', '#pc-own-filter']].forEach(function (x) { var el = PANEL.querySelector(x[1]); if (el) m[x[0]] = el.value; });
+  }
+  function ownSearch() {
+    var m = UI.modal; if (!m || m.kind !== 'own') return;
+    ownKeep(m);
+    var q = String(m.q || '').trim(), ql = q.toLowerCase(), by = {}, wbs = [], chars = [];
+    function sc(s) { s = String(s || '').toLowerCase(); return !ql ? 1 : s === ql ? 3 : s.indexOf(ql) === 0 ? 2 : s.indexOf(ql) >= 0 ? 1 : 0; }
+    try { wbs = getWorldbookNames() || []; } catch (e) {}
+    wbs.forEach(function (w) { var s1 = sc(w); if (s1) by['w:' + w] = { wb: w, via: '', score: s1 + 0.5 }; });   // 书名直接命中比「经角色卡摸到」略优先
+    if (ql) {   // 不输入就只列世界书
+      try { chars = getCharacterNames() || []; } catch (e) {}
+      chars.forEach(function (cn) {
+        var s2 = sc(cn); if (!s2 || by['c:' + cn]) return;
+        var bound = null; try { bound = getCharWorldbookNames(cn); } catch (e) {}
+        [].concat((bound && bound.primary) || []).concat((bound && bound.additional) || []).forEach(function (b) { if (!b || wbs.indexOf(b) < 0) return; var k = 'w:' + b; if (!by[k] || by[k].score < s2) by[k] = { wb: b, via: cn, score: s2 }; });
+        by['c:' + cn] = { wb: '', card: cn, via: cn, score: s2 - 0.25 };
+      });
+    }
+    m.res = Object.keys(by).map(function (k) { return by[k]; }).sort(function (a, b) { return b.score - a.score; }).slice(0, ql ? 8 : 40);
+    m.book = null; m.entries = null; m.sel = []; m.filter = ''; m.err = '';
+    ownRender();
+  }
+  async function ownPick(i) {
+    var m = UI.modal; if (!m || m.kind !== 'own' || !m.res || !m.res[i]) return;
+    ownKeep(m);
+    var it = m.res[i], es = null; m.book = it; m.entries = 'loading'; m.sel = []; m.filter = ''; m.err = ''; ownRender();
+    try {
+      if (it.wb) es = arr(await getWorldbook(it.wb)).map(function (e) { return { n: String((e && (e.name || e.comment)) || ''), t: String((e && e.content) || ''), off: !!(e && e.enabled === false) }; });
+      else es = await ownCardEntries(it.card);
+    } catch (e) { es = null; }
+    if (UI.modal !== m || m.book !== it) return;
+    m.entries = arr(es).filter(function (e) { return e && e.t.trim(); });
+    if (!es) m.err = '这本读不出来，换一本试试，或者把她的设定复制出来「直接贴」。';
+    if (m.entries.length === 1) ownToggle(0, true);
+    ownRender();
+  }
+  async function ownCardEntries(cn) {
+    var out = [], d = null, v2 = {};
+    try { d = typeof getCharData === 'function' ? await getCharData(cn) : null; } catch (e) { d = null; }
+    v2 = (d && d.data) || {};
+    var desc = [(d && d.description) || v2.description, (d && d.personality) || v2.personality].filter(function (x) { return x && String(x).trim(); }).join('\n\n');
+    if (!d) { try { var ch = typeof getCharacter === 'function' ? await getCharacter(cn) : null; if (ch && ch.description) desc = String(ch.description); } catch (e) {} }
+    if (desc) out.push({ n: '（角色卡「' + cn + '」的描述）', t: desc, card: 1 });
+    arr(v2.character_book && v2.character_book.entries).forEach(function (e) { if (e) out.push({ n: String(e.comment || e.name || arr(e.keys)[0] || ''), t: String(e.content || ''), off: e.enabled === false }); });
+    return out;
+  }
+  function ownToggle(i, quiet) {
+    var m = UI.modal; if (!m || m.kind !== 'own' || !Array.isArray(m.entries) || !m.entries[i]) return;
+    if (!quiet) ownKeep(m);
+    var k = m.sel.indexOf(i); if (k >= 0) m.sel.splice(k, 1); else m.sel.push(i);
+    var first = m.entries[m.sel[0]];
+    if (!m.name || m.name === m.auto) { m.auto = first ? C.ownName(first.card && m.book ? m.book.card : first.n) : ''; m.name = m.auto; }
+    m.err = '';
+    if (!quiet) ownRender();
+  }
+  function ownPicked(m) { return Array.isArray(m.entries) ? (m.sel || []).map(function (i) { return m.entries[i] && m.entries[i].t; }).filter(Boolean).join('\n\n') : ''; }
+  // 名字撞了谁：签着的、银星的、借来过的、男优、员工、面试间里等着的
+  function ownTaken(st, nm) {
+    var hit = function (p) { return p && [p.stageName, p.realName, p.name].indexOf(nm) >= 0; };
+    if (st.dir.cast.some(hit)) return '「' + nm + '」已经签在你这儿了。';
+    if (identity(st) === '社长' && (L.cast0 || []).some(hit)) return '「' + nm + '」是银星的人：在「艺人」页借一部，或者挖过来。';
+    if ((L.cast0 || []).some(hit) || arr(st.dir.alumni).some(hit) || allMen(st).some(hit) || staffOf(st).some(function (x) { return x[0] === nm; }) || nm === '柯大河' || (L.banker && nm === L.banker.name)) return '「' + nm + '」是片场里已经有的人，换个名字。';
+    var cur = curCasting(st); if (cur && cur.cands.some(function (x) { return x && x.realName === nm; })) return '「' + nm + '」已经在面试间等着了。';
+    return '';
+  }
+  async function ownGo() {
+    var m = UI.modal; if (!m || m.kind !== 'own') return;
+    ownKeep(m);
+    var nm = String(m.name || '').replace(/\s+/g, ''), paste = m.tab === 'paste', text = C.ownText(paste ? m.text : ownPicked(m)), st = readState();
+    var err = !text ? (paste ? '先把她的设定贴进框里。' : '先挑她的那一条。') : text.length < 20 ? '设定太短了，至少写几句。' : !nm ? '写上她叫什么。' : C.len(nm) > 8 ? '名字最多 8 个字。' : ownTaken(st, nm);
+    if (!err && CUR && CUR.busy) err = '面试间正忙（这一批还在填表），等她们填完再请。';
+    if (err) { m.err = err; ownRender(); return; }
+    var from = paste ? '玩家贴的设定' : m.book.wb ? '世界书「' + m.book.wb + '」里的' + m.sel.map(function (i) { return '「' + (m.entries[i].n || '没标题') + '」'; }).slice(0, 3).join('') : '角色卡「' + m.book.card + '」', av = '';
+    if (!paste && m.book.card) { try { var ap = typeof getCharAvatarPath === 'function' ? await getCharAvatarPath(m.book.card) : ''; if (ap) av = new VIEW.URL(String(ap), VIEW.location.href).href; } catch (e) { av = ''; } }
+    var pure = C.ownPure(paste ? '' : [m.book.wb, m.book.via, m.book.card].join(' '), text);   // SENA 老师那种：直接用，不抽签
+    UI.modal = null;
+    return ownIn({ name: nm, text: text, from: C.clip(from, 80), av: av, pure: pure });
+  }
+  async function ownIn(o) {
+    var st = readState(); if (!dirLike(identity(st))) return;
+    var cur = curCasting(st); if (!cur) cur = CUR = { cands: [] };
+    var na = Array.from(o.name), others = st.dir.cast.concat(cur.cands);
+    var d = C.drawCands(1, st.dir.cast.map(function (x) { return (x.realName || '').charAt(0); }), others.map(function (x) { return x.portrait; }), null, [].concat.apply([], arr(st.dir.ncSeen))), p = d[0];
+    if (o.pure) C.ownStrip(p);   // 直接用：抽好的格子全拿掉
+    else if (d.keys && d.keys.length) save(function (s) { s.dir.ncSeen = arr(s.dir.ncSeen).concat([d.keys]).slice(-(C.NC_RECENT || 4)); });
+    p.surname = na[0] || ''; p.given = na.slice(1).join(''); p.realName = o.name; p.status = 'loading';
+    p.own = { t: o.text, f: o.from || '' }; if (o.pure) p.own.pure = 1;
+    if (o.av) await save(function (s) { s.imgs = obj(s.imgs); s.imgs[p.id] = { av: o.av, il: o.av }; });
+    cur.cands.unshift(p); cur.busy = true; goCand(p.id);
+    return genCandFrom(p, ownContact(p), cur);
+  }
+  function ownContact(p) { return { id: 'own_' + p.id, name: p.realName, kind: 'free' }; }
+  function ownHtml(st, m) {
+    var h = '<div class="eb">BRING YOUR OWN</div><h2 class="h">🎴 带自己的人来</h2><div class="sub">别的世界书、角色卡里写好的她，或者直接贴一段人设：她带着自己的设定来面试。设定一字不改照搬，经验、组里说她、XP、NG 这几格照设定填，设定没写到的才抽签补；签不签照常谈。不花招聘费，花一次请求。只招女优。</div>' +
+      '<div class="chips" style="margin-top:10px"><button class="chip' + (m.tab !== 'paste' ? ' on' : '') + '" data-act="own-tab" data-v="wb">从世界书 / 角色卡挑</button><button class="chip' + (m.tab === 'paste' ? ' on' : '') + '" data-act="own-tab" data-v="paste">直接贴</button></div>';
+    if (m.tab === 'paste') h += '<textarea id="pc-own-text" style="min-height:220px;margin-top:10px" placeholder="把她的人设整段贴进来：name / age / 外貌 / 性格 / NSFW 那种也行，什么格式都认。">' + esc(m.text || '') + '</textarea>';
+    else {
+      h += '<div class="sub faint" style="margin-top:8px" data-pc-sena>' + esc(OWN_SENA) + '</div>' +
+        '<div class="row" style="margin-top:8px;flex-wrap:nowrap"><input id="pc-own-q" type="text" placeholder="世界书名 / 角色卡名（空着点「搜」列出全部世界书）" value="' + esc(m.q || '') + '" style="flex:1;min-width:0;width:auto"><button class="btn sm" data-act="own-search">搜</button></div>';
+      if (m.res) h += m.res.length ? '<div class="lbl">挑一本</div><div class="pc-ownlist">' + m.res.map(function (it, i) {
+        return '<button class="pc-ownrow' + (m.book === it ? ' on' : '') + '" data-act="own-book" data-i="' + i + '"><b>' + esc(it.wb || '角色卡「' + it.card + '」本身') + '</b><small>' + esc(it.wb ? (it.via ? '绑在角色卡「' + it.via + '」上' : '世界书') : '卡的描述，和卡里自带的世界书（导卡时没导进世界书的也读得到）') + '</small></button>';
+      }).join('') + '</div>' : '<div class="faint" style="margin-top:8px">没搜到。试试世界书名的一部分，或者她在的那张角色卡的卡名。</div>';
+      if (m.book && m.entries === 'loading') h += '<div class="busy" style="margin-top:8px">在翻这本……</div>';
+      else if (m.book && Array.isArray(m.entries)) {
+        var fl = String(m.filter || '').trim().toLowerCase();
+        h += '<div class="lbl">挑她的那一条（几条也行，关着的也能挑）</div>' + (m.entries.length > 8 ? '<input id="pc-own-filter" type="text" placeholder="按名字筛" value="' + esc(m.filter || '') + '" style="margin-bottom:6px">' : '') +
+          (m.entries.length ? '<div class="pc-ownlist tall">' + m.entries.map(function (e, i) {
+            var on = m.sel.indexOf(i) >= 0, key = (e.n + ' ' + e.t.slice(0, 200)).toLowerCase();
+            return '<button class="pc-ownrow' + (on ? ' on' : '') + '" data-act="own-entry" data-i="' + i + '" data-k="' + esc(key) + '"' + (fl && !on && key.indexOf(fl) < 0 ? ' style="display:none"' : '') + '><b>' + (on ? '✓ ' : '') + esc(e.n || '（没标题）') + (e.off ? ' <span class="tag gr">关着的</span>' : '') + '</b><small>' + esc(e.t.replace(/\s+/g, ' ').slice(0, 60)) + ' · ' + e.t.length + ' 字</small></button>';
+          }).join('') + '</div>' : '<div class="faint">这本里没有写了字的条目。</div>');
+        var pk = ownPicked(m);
+        if (pk) h += '<div class="faint" style="margin-top:6px" data-pc-ownsum>已挑 ' + m.sel.length + ' 条，共 ' + pk.length + ' 字' + (pk.length > C.OWN_MAX ? '（超过 ' + C.OWN_MAX + ' 字的部分不收）' : '') + '</div>';
+      }
+    }
+    h += '<div class="lbl">她叫</div><input id="pc-own-name" type="text" maxlength="12" placeholder="本名，签约时再起艺名" value="' + esc(m.name || '') + '">' +
+      (m.err ? '<div class="err">' + esc(m.err) + '</div>' : '') + '<div class="act"><button class="btn" data-act="modal-x">算了</button><button class="btn pri" data-act="own-go"' + (CUR && CUR.busy ? ' disabled' : '') + '>请她来面试</button></div>';
+    return h;
+  }
+  function ownFilter(v) {
+    var m = UI.modal; if (m && m.kind === 'own') m.filter = v;
+    var fl = String(v || '').trim().toLowerCase();
+    PANEL.querySelectorAll('[data-act="own-entry"]').forEach(function (b) { var on = b.classList.contains('on'); b.style.display = !fl || on || String(b.getAttribute('data-k') || '').indexOf(fl) >= 0 ? '' : 'none'; });
+  }
+  // ── 改档案（v0.1.48，crazyman2333「读世界书五次就成一次，要不加编辑功能吧」）：面试间的人、签下的人，档案那几格自己改；「她自己的设定」也能贴一段进去 ──
+  //   身体那几项跟体检走（profile.js），这里不改；改了体质 / 床上，档案钩子照剩下的抽签格子重算（core.refx）
+  var PEDIT = [['age', '年龄'], ['tier', '能接的尺度'], ['hometown', '老家'], ['look', '外形'], ['past', '入行前'], ['motive', '为什么来'], ['want', '心里话'], ['stuck', '卡在哪'], ['talk', '说话'], ['phys', '体质'], ['react', '床上'], ['xp', 'XP'], ['traits', '特质'], ['ng', 'NG'], ['intro', '自我介绍'], ['own', '她自己的设定']];
+  var PEDIT_BIG = { look: 1, intro: 1, own: 1 };
+  function peditWho(st, id) {
+    var c = CUR && CUR.cands.find(function (x) { return x && x.id === id && x.status === 'ok'; }); if (c) return { p: c, cand: true };
+    var r = st.dir.cast.find(function (x) { return x && x.id === id && !x.borrowed; }); return r ? { p: r, cand: false } : null;
+  }
+  function peditVal(p, k) {
+    var g = p.gen || {};
+    if (k === 'want') return g.want || p.need || '';
+    if (k === 'stuck') return p.stuck || g.stuck || '';
+    if (k === 'intro') return g.intro || '';
+    if (k === 'own') return (p.own && p.own.t) || '';
+    if (k === 'xp' || k === 'ng' || k === 'traits') return arr(p[k]).join('；');
+    return p[k] == null ? '' : String(p[k]);
+  }
+  function peditKeep() { var m = UI.modal; if (!m || m.kind !== 'pedit') return; m.vals = m.vals || {}; PANEL.querySelectorAll('[data-pedit]').forEach(function (el) { m.vals[el.getAttribute('data-pedit')] = el.value; }); }
+  function peditHtml(st, m) {
+    var w = peditWho(st, m.id); if (!w) return '<div class="sub">这个人不在了。</div><div class="act"><button class="btn" data-act="modal-x">关上</button></div>';
+    var p = w.p, h = '<div class="eb">EDIT</div><h2 class="h">✏ 改档案 · ' + esc(p.stageName || p.realName || '') + '</h2><div class="sub">面试读错了、跟她的设定对不上，在这里直接改，改了以后请她聊聊、试戏、叮叮、正文都照新的写。XP、NG、特质用「；」隔开。身高、罩杯这些身体项跟体检走，在档案页看，这里不改。</div>';
+    PEDIT.forEach(function (f) {
+      var v = m.vals && m.vals[f[0]] != null ? m.vals[f[0]] : peditVal(p, f[0]);
+      if (f[0] === 'tier') { h += '<div class="lbl">' + f[1] + '</div><select data-pedit="tier">' + C.TIERS.map(function (t) { return '<option' + (t === v ? ' selected' : '') + '>' + esc(t) + '</option>'; }).join('') + '</select>'; return; }   // 尺度换了片酬跟着换
+      h += '<div class="lbl">' + f[1] + '</div>' + (PEDIT_BIG[f[0]] ? '<textarea data-pedit="' + f[0] + '"' + (f[0] === 'own' ? ' style="min-height:160px" placeholder="她原本的人设（从别的卡、世界书复制过来的也行）：正文、叮叮整段带着"' : '') + '>' + esc(v) + '</textarea>' : '<input type="text" data-pedit="' + f[0] + '" value="' + esc(v) + '">');
+    });
+    return h + (m.err ? '<div class="err">' + esc(m.err) + '</div>' : '') + '<div class="act"><button class="btn" data-act="modal-x">算了</button><button class="btn pri" data-act="pedit-go">存</button></div>';
+  }
+  // 把改过的格子写回去：返回 { err } 或 { got: 改了哪几格 }
+  function peditApply(p, v) {
+    var got = [], g = p.gen = obj(p.gen);
+    if (v.age != null && String(v.age).trim() !== String(p.age == null ? '' : p.age)) { var age = parseInt(v.age, 10); if (!(age >= 18 && age <= 60)) return { err: '年龄写 18 到 60 之间的数。' }; p.age = age; got.push('age'); }
+    if (v.tier && v.tier !== p.tier && C.TIERS.indexOf(v.tier) >= 0) { p.tier = v.tier; if (p.oneShot) { p.baseFee = C.filmFee(p.rank, p.tier); p.fee = oneFee({ fee: p.baseFee }); } else p.fee = C.filmFee(p.rank, p.tier); got.push('tier'); }
+    ['hometown', 'look', 'past', 'motive', 'talk', 'phys', 'react'].forEach(function (k) {
+      if (v[k] == null) return; var t = C.clip(String(v[k]).replace(/\s+/g, ' ').trim(), k === 'look' ? 120 : 80); if (t === (p[k] || '')) return;
+      if (t) p[k] = t; else delete p[k]; got.push(k);
+      if (k === 'phys' || k === 'react') { p.fgT = obj(p.fgT); p.fgT[k] = 1; }
+    });
+    if (got.indexOf('look') >= 0) p.lookReq = C.reqOfText(p.look || '', p.age);
+    if (got.indexOf('phys') >= 0 || got.indexOf('react') >= 0) C.refx(p);
+    if (v.want != null && String(v.want).trim() !== peditVal(p, 'want')) { g.want = C.clip(String(v.want).trim(), 60); got.push('want'); }
+    if (v.stuck != null && String(v.stuck).trim() !== peditVal(p, 'stuck')) { var su = C.clip(String(v.stuck).trim(), 60); p.stuck = su; if (g.stuck) g.stuck = su; got.push('stuck'); }
+    if (v.intro != null && String(v.intro).trim() !== peditVal(p, 'intro')) { g.intro = C.clip(String(v.intro).trim(), 300); got.push('intro'); }
+    ['xp', 'traits', 'ng'].forEach(function (k) {
+      if (v[k] == null || String(v[k]).trim() === peditVal(p, k)) return;
+      p[k] = String(v[k]).split(/[；;、\n]+/).map(function (x) { return C.clip(x.trim(), 26); }).filter(Boolean).slice(0, 6); got.push(k);
+    });
+    if (v.own != null && C.ownText(v.own) !== peditVal(p, 'own')) { var ot = C.ownText(v.own); if (ot) p.own = { t: ot, f: (p.own && p.own.f) || '玩家贴的设定' }; else delete p.own; got.push('own'); }
+    return { got: got };
+  }
+  async function peditGo() {
+    var m = UI.modal; if (!m || m.kind !== 'pedit') return;
+    peditKeep();
+    var st = readState(), w = peditWho(st, m.id); if (!w) { UI.modal = null; render(); return; }
+    var res = null;
+    if (w.cand) { res = peditApply(w.p, m.vals || {}); if (!res.err && res.got.length) await persistCasting(); }
+    else await save(function (s) { var r = s.dir.cast.find(function (x) { return x && x.id === m.id; }); if (r) res = peditApply(r, m.vals || {}); });
+    if (res && res.err) { m.err = res.err; render(); return; }
+    UI.modal = null; toast('success', res && res.got.length ? '档案改好了（' + res.got.map(function (k) { return (PEDIT.find(function (f) { return f[0] === k; }) || [k, k])[1]; }).join('、') + '）' : '没改什么');
+    if (!w.cand) { applyTalent(); try { if (DD) DD.refreshInjection(); } catch (e) {} }
+    render();
+  }
   // 正文里谈好了的：弹一条，点了直接开「签下 / 只拍一部」起艺名（签约金照常从账上走）
   function dealToast(p) {
-    var msg = '正文里跟' + p.realName + '谈好了' + (p.deal === 'one' ? '只拍一部' : '签约') + '：点这条起个艺名，签下她';
+    var msg = (p.dealFrom === 'dd' ? '叮叮里' : '正文里') + '跟' + p.realName + '谈好了' + (p.deal === 'one' ? '只拍一部' : '签约') + '：点这条起个艺名，签下她';
     try { if (typeof toastr !== 'undefined') toastr.success(msg, '声色片场', { timeOut: 30000, extendedTimeOut: 10000, closeButton: true, tapToDismiss: true, onclick: function () { openDeal(p.id); } }); } catch (e) {}
     try { console.info('[声色片场] ' + msg); } catch (e) {}
   }
@@ -11346,6 +11639,9 @@ var PIANCHANG_ONLINE = (function () {
     P + ' .ledger .r{display:grid;grid-template-columns:64px minmax(0,1fr) auto;gap:8px;padding:6px 0;border-bottom:1px solid var(--pc-line);font-size:13.5px;}',
     P + ' .ledger .r .a{font-variant-numeric:tabular-nums;white-space:nowrap;}',
     P + ' .ledger .r .a.p{color:var(--pc-green);}' + P + ' .ledger .r .a.m{color:#f08a80;}',
+    P + ' .pc-ownlist{display:flex;flex-direction:column;gap:6px;max-height:220px;overflow:auto;margin-top:6px;}' + P + ' .pc-ownlist.tall{max-height:300px;}',
+    P + ' .pc-ownrow{display:block;width:100%;text-align:left;border:1px solid var(--pc-line);background:transparent;color:var(--pc-ink);border-radius:10px;padding:8px 10px;font:inherit;cursor:pointer;}' + P + ' .pc-ownrow.on{border-color:var(--pc-amber);background:rgba(0,0,0,.04);}',
+    P + ' .pc-ownrow b{display:block;font-size:13.5px;}' + P + ' .pc-ownrow small{display:block;margin-top:2px;color:var(--pc-faint);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}',
     P + ' .ledger .r .undo{margin-left:6px;padding:0 2px;border:0;background:none;color:var(--pc-faint);font:inherit;font-size:12px;text-decoration:underline;cursor:pointer;}' + P + ' .ledger .r.x .n,' + P + ' .ledger .r.x .a{text-decoration:line-through;opacity:.55;}',
     P + ' .noid{display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;min-height:60vh;text-align:center;color:var(--pc-sub);}',
     P + ' .noid b{font-size:22px;color:var(--pc-ink);}',
@@ -11862,10 +12158,11 @@ var PIANCHANG_ONLINE = (function () {
   function candCard(c, i) {
     var g = c.gen || {}, ok = c.status === 'ok';
     var h = photoTop(c, c.surname, 'No.' + String((i || 0) + 1).padStart(2, '0')) + '<div class="pc-tb">' +
-      '<h3 class="pc-name"><span class="rb">NEWCOMER' + (ok ? ' · 本名' : '') + '</span>' + esc(ok || c.ddFrom ? c.realName : c.surname + ' ……') + '<small>' + c.age + ' 岁 · ' + esc(c.hometown) + '</small></h3>' +
+      '<h3 class="pc-name"><span class="rb">NEWCOMER' + (ok ? ' · 本名' : '') + '</span>' + esc(ok || c.ddFrom || c.own ? c.realName : c.surname + ' ……') + '<small>' + c.age + ' 岁 · ' + esc(c.hometown) + '</small></h3>' +
       '<div class="pc-line">' + tierTag(c.tier) + (c.grade ? '<span class="tag' + (c.gradeKey === 'S' || c.gradeKey === 'SS' ? '' : ' gr') + '" data-pc-grade="' + esc(c.gradeKey) + '">' + esc(c.grade) + ' · ' + esc(c.gradeKey) + '</span>' : '') + '<span>' + esc(c.rankLabel) + ' · 一部 ' + esc(money(c.fee)) + ' · 签约金 ' + esc(money(c.signFee)) + '</span></div>' +
       (c.forScript ? '<div class="pc-line"><span class="tag gr" data-pc-for="' + esc(c.forScript.sid || '') + '">冲《' + esc(c.forScript.title) + '》来的</span>' + (c.firstTime ? '<span class="tag">第一次进棚</span>' : '') + '</div>' : '') +
-      (c.ddFrom ? '<div class="pc-line"><span class="tag gr" data-pc-dd="' + esc(c.ddFrom) + '">叮叮约来的</span>' + (c.recWb ? ' <span class="tag gr" data-pc-recwb>照世界书写的</span>' : '') + (c.deal ? ' <span class="tag" data-pc-deal>正文里谈好了' + (c.deal === 'one' ? '只拍一部' : '签约') + '</span>' : '') + '</div>' : '');   // v0.1.28；v0.1.39 读到了她的世界书条目
+      (c.ddFrom ? '<div class="pc-line"><span class="tag gr" data-pc-dd="' + esc(c.ddFrom) + '">叮叮约来的</span>' + (c.recWb ? ' <span class="tag gr" data-pc-recwb>照世界书写的</span>' : '') + (c.deal ? ' <span class="tag" data-pc-deal>' + (c.dealFrom === 'dd' ? '叮叮里' : '正文里') + '谈好了' + (c.deal === 'one' ? '只拍一部' : '签约') + '</span>' : '') + '</div>' : '') +   // v0.1.28；v0.1.39 读到了她的世界书条目
+      (c.own ? '<div class="pc-line"><span class="tag gr" data-pc-own>' + (c.own.pure ? '照设定直接用' : '自己带来的') + '</span>' + (c.own.f ? '<span class="faint">' + esc(c.own.f) + '</span>' : '') + (c.deal && !c.ddFrom ? ' <span class="tag" data-pc-deal>' + (c.dealFrom === 'dd' ? '叮叮里' : '正文里') + '谈好了' + (c.deal === 'one' ? '只拍一部' : '签约') + '</span>' : '') + '</div>' : '');   // v0.1.48
     if (c.status === 'loading') return '<article class="pc-tal' + (UI.hlCand && UI.hlCand === c.id ? ' hl' : '') + '" data-pc-card="cand" data-id="' + esc(c.id) + '">' + h + '<div class="busy" style="margin-top:12px">她在门口填表……</div></div></article>';
     // 卡面只放最有戏的六层（一项一行）；其余几层进「请她进来聊聊」的人设。v0.1.5 以前的候选人没有抽签池那几层，照旧显示本事 / 卡在哪
     h += profRows(c.pool >= 2 ? [['外形', c.look], ['入行前', c.past], ['为什么来', c.motive], ['心里话', g.want || c.need], ['卡在哪', c.stuck], ['面试那天', c.entrance], ['组里说她', C.gradeLine(c, true)], ['体质', c.phys], ['床上', c.react], ['说话', c.talk]]
@@ -11873,15 +12170,16 @@ var PIANCHANG_ONLINE = (function () {
       (g.intro ? '<div class="say">' + esc(g.intro) + '</div>' : '') + (g.answer ? '<div class="sub">问她为什么来：' + esc(g.answer) + '</div>' : '') + (c.sig ? '<div class="sub" data-pc-sig>招牌：「' + esc(c.sig) + '」</div>' : '');
     h += c.status === 'error'
       ? '<div class="err" style="margin-top:8px">' + esc(c.err || '没生成出来') + '</div><div class="pc-acts"><button class="btn sm" data-act="cand-retry" data-id="' + c.id + '">再试一次</button><button class="btn sm" data-act="cand-pass" data-id="' + c.id + '">不要了</button></div>'
-      : '<div class="pc-acts"><button class="btn sm pri" data-act="cand-sign" data-id="' + c.id + '">签约 · 起艺名</button><button class="btn sm" data-act="cand-one" data-id="' + c.id + '" title="不收签约金，片酬贵一半，拍完就走">只拍一部</button><button class="btn sm" data-act="cand-pass" data-id="' + c.id + '">不要</button><button class="btn sm wide" data-act="invite" data-id="' + c.id + '">请她进来聊聊</button></div>';
+      : '<div class="pc-acts"><button class="btn sm pri" data-act="cand-sign" data-id="' + c.id + '">签约 · 起艺名</button><button class="btn sm" data-act="cand-one" data-id="' + c.id + '" title="不收签约金，片酬贵一半，拍完就走">只拍一部</button><button class="btn sm" data-act="cand-pass" data-id="' + c.id + '">不要</button><button class="btn sm" data-act="pedit" data-id="' + c.id + '" title="面试读错了、跟她的设定对不上：自己改">✏ 改档案</button><button class="btn sm wide" data-act="invite" data-id="' + c.id + '">请她进来聊聊</button></div>';
     return '<article class="pc-tal' + (UI.hlCand && UI.hlCand === c.id ? ' hl' : '') + '" data-pc-card="cand" data-id="' + esc(c.id) + '">' + h + '</div></article>';
   }
   function renderCasting(st) {
     curCasting(st);   // v0.1.28：撤回、刚读档时 CUR 还空着：从存档里接回这一批
     var h = '<div class="eb">CASTING</div><h2 class="h">选角 · 一次面三个新人</h2>' +
-      '<div class="sub" style="margin-bottom:12px">三份简历送到了：外形、经历、能接的尺度、XP 和 NG 都写在上面；名字、心里话、自我介绍，等她们进门自己说。签下来要起艺名，<b>签了第二天就能进棚</b>。叮叮里加过的人，在她的聊天页点「📋 约来面试」也能请来。</div>' +
+      '<div class="sub" style="margin-bottom:12px">三份简历送到了：外形、经历、能接的尺度、XP 和 NG 都写在上面；名字、心里话、自我介绍，等她们进门自己说。签下来要起艺名，<b>签了第二天就能进棚</b>。叮叮里加过的人，在她的聊天页点「📋 约来面试」也能请来；别的卡、世界书里写好的她，点「🎴 带自己的人来」。</div>' +
       '<div class="row" style="margin-bottom:14px"><button class="btn pri" data-act="cast-start"' + (CUR && CUR.busy ? ' disabled' : '') + '>' + (CUR && CUR.cands.length ? '再面三个' : '开始面试') + '</button>' +
-      '<button class="btn" data-act="cast-script"' + (CUR && CUR.busy ? ' disabled' : '') + ' title="挑一部剧本、她的位子：按年龄、尺度、经历先筛一遍再来面试">📋 按剧本招（' + esc(money(E.adFee || 0)) + '）</button>' + (CUR && CUR.busy ? '<span class="busy">她们在门口填表……</span>' : '') + '</div>';
+      '<button class="btn" data-act="cast-script"' + (CUR && CUR.busy ? ' disabled' : '') + ' title="挑一部剧本、她的位子：按年龄、尺度、经历先筛一遍再来面试">📋 按剧本招（' + esc(money(E.adFee || 0)) + '）</button>' +
+      '<button class="btn" data-act="own-open"' + (CUR && CUR.busy ? ' disabled' : '') + ' title="别的世界书、角色卡里写好的她，或者直接贴一段人设">🎴 带自己的人来</button>' + (CUR && CUR.busy ? '<span class="busy">她们在门口填表……</span>' : '') + '</div>';
     if (CUR && CUR.byScript) h += '<div class="card hl" data-pc-byscript="' + esc(CUR.byScript.sid || '') + '"><div class="eb">按剧本招</div>这一批是看了招聘来的：《' + esc(CUR.byScript.title) + '》找「' + esc(CUR.byScript.role) + '」。签下来以后开机选角，这个位子默认填她。</div>';
     if (!CUR || !CUR.cands.length) return h + '<div class="empty">面试间空着。点「开始面试」，三个新人推门进来；或者「按剧本招」，冲着一部本子招人。</div>' + menCasting(st);
     return h + '<div class="pc-tgrid">' + CUR.cands.map(candCard).join('') + '</div>' + menCasting(st);
@@ -11963,6 +12261,7 @@ var PIANCHANG_ONLINE = (function () {
       personTags(c) +
       '<div class="rn">' + (left ? '今天才签的约，' + esc(C.mdShort(C.canShootDay(c))) + ' 起能进棚' : '可以开拍') + (films.length ? ' · 拍过：' + films.map(function (f) { return '《' + esc(f.title) + '》' + (f.status === 'pulled' ? '（被抽查下架）' : f.status === 'withdrawn' ? '（撤了）' : ''); }).join('、') : '') + '</div></div>' +
       '<div class="rt">' + (PF ? '<button class="btn sm" data-act="profile" data-id="' + esc(c.id) + '">档案</button>' : '') +   // 女优档案（profile.js 在才有）
+      (c.borrowed ? '' : '<button class="btn sm" data-act="pedit" data-id="' + esc(c.id) + '">改档案</button>') +   // v0.1.48
       '<button class="btn sm" data-act="invite" data-id="' + c.id + '">请她进来聊聊</button><button class="btn sm" data-act="to-take" data-id="' + c.id + '">' + (identity(st) === '社长' ? '排练' : '试戏') + '</button>' +
       (c.borrowed && identity(st) === '社长' ? '<button class="btn sm" data-act="poach-ask" data-id="' + esc(c.id) + '">挖过来</button>' : '') + '</div></div>';
   }
@@ -12490,6 +12789,8 @@ var PIANCHANG_ONLINE = (function () {
     var body = '';
     if (m.kind === 'ledger') body = '<div class="eb">LEDGER</div><h2 class="h">' + moneyLabel(identity(st)) + ' · 账本</h2><div class="big">' + esc(money(st.money)) + '</div>' + ledgerHtml(st) + '<div class="act"><button class="btn" data-act="modal-x">关上</button></div>';
     else if (m.kind === 'byscript') body = byScriptHtml(st, m);
+    else if (m.kind === 'own') body = ownHtml(st, m);   // v0.1.48
+    else if (m.kind === 'pedit') body = peditHtml(st, m);
     else if (m.kind === 'sign') { var c = CUR && CUR.cands.find(function (x) { return x.id === m.id; }); body = '<div class="eb">' + (m.one ? 'ONE FILM' : 'SIGN') + '</div><h2 class="h">' + (m.one ? '只拍一部 · ' : '签下 ') + esc(c ? c.realName : '') + '</h2><div class="sub">起一个艺名（1 到 6 个字）。' + (m.one ? '不收签约金，片酬 ' + esc(money(c ? oneFee(c) : 0)) + '（比签约贵一半），拍完这一部就走；拍得好，再在「卡司」页「合作过的」里签下她。' : '签约金 ' + esc(money(c ? c.signFee : 0)) + '，一部片酬 ' + esc(money(c ? c.fee : 0)) + '。') + '明天（' + esc(C.mdText(st.day + LAW.signToShoot)) + '）起就能进棚。</div><input type="text" id="pc-stage-in" maxlength="6" placeholder="艺名" style="margin-top:10px">' + (m.err ? '<div class="err">' + esc(m.err) + '</div>' : '') + '<div class="act"><button class="btn" data-act="modal-x">再想想</button><button class="btn pri" data-act="sign-ok" data-id="' + esc(m.id) + '">' + (m.one ? '就拍一部' : '签') + '</button></div>'; }
     else if (m.kind === 'endday') body = '<div class="eb">END OF DAY</div>' + (m.why ? '<div class="sub">正文里写到了 ' + esc(m.why) + '，离片场的今天（' + esc(C.mdShort(st.day)) + '）差 ' + m.n + ' 天。跟着跳吗？AI 写错了日期就点「算了」。</div>' : '') + '<h2 class="h">' + (m.n > 1 ? '跳到 ' + esc(C.mdText(st.day + m.n)) + '（' + m.n + ' 天）' : '结束今天') + '</h2><div class="sub">' + (m.n > 1 ? '中间每一天照样过：月初结账、发售、片酬到账、新片约都会算。' : '明天是 ' + esc(C.mdText(st.day + 1)) + '。') + (markText(st, st.day + m.n) ? '那天：' + esc(markText(st, st.day + m.n)) : '') + '</div>' + (curShoot(st) ? '<div class="err">片场还在拍：过了今天也接着算这一部。</div>' : '') + '<div class="act"><button class="btn" data-act="modal-x">算了</button><button class="btn pri" data-act="endday-ok" data-n="' + m.n + '"' + (m.clock ? ' data-clock="' + esc(m.clock) + '"' : '') + '>好</button></div>';
     else if (m.kind === 'script') { var rec = scriptRec(st, m.id), sc = parsed(rec); body = '<div class="eb">SCRIPT</div><h2 class="h">《' + esc(sc ? sc.title : '') + '》</h2>' + (rec && rec.slots ? '<div class="faint" style="margin-bottom:6px">抽卡单：' + esc(rec.slots) + '</div>' : '') + '<div class="script">' + esc(rec && sc ? C.markIdea(C.scriptAllText(sc), rec.idea) : '') + '</div><div class="act">' + (sc && scEditable(rec) ? '<button class="btn" data-act="sc-edit" data-id="' + esc(m.id) + '">✏ 编辑</button>' : '') + (sc ? '<button class="btn" data-act="sc-post" data-id="' + esc(m.id) + '">📄 发剧本</button>' : '') + '<button class="btn" data-act="modal-x">关上</button></div>'; }
@@ -12592,6 +12893,8 @@ var PIANCHANG_ONLINE = (function () {
     var t = curTab(st), main = PANEL.querySelector('.pc-main'), scroll = main ? main.scrollTop : 0, sameTab = PANEL.getAttribute('data-cur') === t;
     var dlg = PANEL.querySelector('.pc-dialog'), dScroll = dlg ? dlg.scrollTop : 0;
     var custom = PANEL.querySelector('#pc-custom'); if (custom && UI.modal && UI.modal.kind === 'custom') UI.modal.text = custom.value;
+    if (UI.modal && UI.modal.fresh) delete UI.modal.fresh; else ownKeep();   // v0.1.48 带自己的人来 / 改档案：后台重画别把填了的字丢了；弹框自己刚改过的（ownRender）以改的为准
+    peditKeep();
     var scEd = PANEL.querySelector('#pc-scedit'); if (scEd && UI.modal && UI.modal.kind === 'scedit') UI.modal.text = scEd.value;
     var coIn = PANEL.querySelector('#pc-coname'); if (coIn && UI.coRename) UI.coRename.draft = coIn.value;
     var fIn = PANEL.querySelector('#pc-face-url'); if (fIn && UI.face) UI.face.url = fIn.value;
@@ -12762,10 +13065,11 @@ var PIANCHANG_ONLINE = (function () {
     else if (t.id === 'pc-spd') { var sv = PANEL.querySelector('#pc-spd-v'); if (sv) sv.textContent = spdText(t.value); }
     else if (ON) ON.change(t);
   });
-  PANEL.addEventListener('input', function (e) { var t = e.target; if (t && t.getAttribute && t.getAttribute('data-tk') === 'dir') UI.tk.dir = t.value; else if (ON && t && t.id && t.id.indexOf('pc-ol-') === 0) ON.input(t); });
+  PANEL.addEventListener('input', function (e) { var t = e.target; if (t && t.id === 'pc-own-filter') ownFilter(t.value); else if (t && t.getAttribute && t.getAttribute('data-tk') === 'dir') UI.tk.dir = t.value; else if (ON && t && t.id && t.id.indexOf('pc-ol-') === 0) ON.input(t); });
   PANEL.addEventListener('keydown', function (e) {
     if (e.key !== 'Enter' || e.isComposing || e.keyCode === 229) return;
     if (e.target && e.target.id === 'pc-stage-in') { e.preventDefault(); signCand(UI.modal && UI.modal.id, e.target.value); }
+    if (e.target && e.target.id === 'pc-own-q') { e.preventDefault(); ownSearch(); }   // v0.1.48
     else if (e.target && e.target.id === 'pc-coname') { e.preventDefault(); coRename(e.target.value); }
     else if (ON && e.target && e.target.id && e.target.id.indexOf('pc-ol-') === 0 && ON.enter(e.target)) e.preventDefault();
   });
@@ -12801,6 +13105,14 @@ var PIANCHANG_ONLINE = (function () {
       case 'cast-script': UI.modal = { kind: 'byscript', sid: '', call: '' }; render(); break;
       case 'cs-call': if (UI.modal && UI.modal.kind === 'byscript') UI.modal.call = t.getAttribute('data-v') || ''; render(); break;
       case 'led-undo': ledUndo(Number(t.getAttribute('data-q'))); break;
+      case 'own-open': ownOpen(); break;   // v0.1.48 带自己的人来
+      case 'own-tab': if (UI.modal && UI.modal.kind === 'own') { ownKeep(); UI.modal.tab = t.getAttribute('data-v') === 'paste' ? 'paste' : 'wb'; UI.modal.err = ''; ownRender(); } break;
+      case 'own-search': ownSearch(); break;
+      case 'own-book': ownPick(Number(t.getAttribute('data-i'))); break;
+      case 'own-entry': ownToggle(Number(t.getAttribute('data-i'))); break;
+      case 'own-go': ownGo(); break;
+      case 'pedit': UI.modal = { kind: 'pedit', id: t.getAttribute('data-id') || '' }; render(); break;   // v0.1.48 改档案
+      case 'pedit-go': peditGo(); break;
       case 'cs-go': { var bm = UI.modal; if (!bm || bm.kind !== 'byscript' || !bm.sid) break; var cr0 = castReqs(st, bm.sid, bm.call); if (!cr0) break; UI.modal = null; UI.tab = 'casting'; lsSet(TAB_KEY, UI.tab); startCasting({ sid: bm.sid, call: cr0.role.call }); break; }
       // 排练室
       case 'tk-mode': UI.tk.mode = t.getAttribute('data-v') === 'partner' ? 'partner' : 'dir'; render(); break;
@@ -13548,7 +13860,7 @@ var PIANCHANG_ONLINE = (function () {
   }
   // 面板 / 叮叮里动了存档的点击记一笔时间（捕获阶段，先于各自的处理）。纯翻页、开关弹层、设置、联机市场（联机的不撤）、换图不算
   var RB_NAV = { close: 1, 'theme-open': 1, 'theme-close': 1, 'theme-set': 1, settings: 1, 'set-save': 1, 'key-clear': 1, 'llm-test': 1, 'llm-models': 1, 'tips-again': 1, 'tips-ok': 1, 'modal-x': 1, 'modal-bg': 1,
-    ledger: 1, 'cal-prev': 1, 'cal-next': 1, endday: 1, skip: 1, 'to-co': 1, 'co-rename': 1, 'co-rename-x': 1, 'cast-script': 1, 'cs-call': 1, 'tk-mode': 1, 'tk-who': 1, 'tk-n': 1, 'mk-pov': 1, scf: 1,
+    ledger: 1, 'cal-prev': 1, 'cal-next': 1, endday: 1, skip: 1, 'to-co': 1, 'co-rename': 1, 'co-rename-x': 1, 'cast-script': 1, 'cs-call': 1, 'own-open': 1, 'own-tab': 1, 'own-search': 1, 'own-book': 1, 'own-entry': 1, pedit: 1, 'tk-mode': 1, 'tk-who': 1, 'tk-n': 1, 'mk-pov': 1, scf: 1,
     profile: 1, 'to-take': 1, 'gen-open': 1, 'idea-open': 1, 'gen-mode': 1, 'gen-tier': 1, 'idea-pov': 1, 'idea-len': 1, 'gen-toku': 1, 'gen-draw': 1, 'custom-open': 1, 'custom-pull': 1, 'sc-view': 1, 'sc-edit': 1, 'sc-take': 1, 'sc-shoot': 1,
     'cand-sign': 1, 'sh-drop-ask': 1, 'poach-ask': 1, 'yx-ask': 1, 'cand-one': 1, 'mcand-sign': 1, 'man-fire-ask': 1, 'wb-retry': 1, 'sc-post': 1, 'rb-ok': 1, 'rb-keep': 1 };
   var RB_DDX = { flush: 1, send: 1, stk: 1, 'tf-go': 1, 'vc-go': 1, reroll: 1, recall: 1, claim: 1, inv: 1, call: 1, 'c-popok': 1, 'c-roll': 1, 'c-hang': 1, 'set-clear': 1 };
@@ -13644,7 +13956,7 @@ var PIANCHANG_ONLINE = (function () {
         identity: function (s) { return identity(s); },
         ttsConfig: function () { return ttsConfig(); },   // 设置页的语音：{ backend, fish: {key,url,model,source}|null, mm: {...}|null, speed }
         quiet: function (s) { return !!curShoot(s || readState()); },   // 拍摄中不主动来消息
-        castInfo: function (c, s) { return castInfo(c, s || readState()); }, castIn: function (c) { return castIn(c); },   // v0.1.28 约来面试
+        castInfo: function (c, s) { return castInfo(c, s || readState()); }, castIn: function (c, o) { return castIn(c, o); },   // v0.1.28 约来面试；v0.1.48 叮叮里直接签（o.deal）
         hookMain: false,   // MESSAGE_RECEIVED 由主脚本在 onTimeTag 之后转给 DD.onMainReceived
       });
     } catch (e) { DD = null; try { console.warn('[声色片场] 叮叮没起来', e); } catch (e2) {} }
