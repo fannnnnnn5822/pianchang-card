@@ -2294,6 +2294,28 @@ var PIANCHANG_CORE = (function () {
     if (rndFloat() >= 0.3) return '';
     return pick(poolOf('mishap', tierIdx(tier)).filter(function (x) { return !avoid || avoid.indexOf(x) < 0; })) || '';
   }
+  // v0.1.53（10091009mc「演人妻，婚戒戴错了手」、crazyman2333「没穿衣服的戏给我随机一个浴衣穿反了」）：开拍时抽的片场意外先看剧本——
+  //   说到剧本里得有的东西（婚戒、浴衣、泳池、绳子…），剧本里没有就不抽；{{user}} 自己坐男优位·主时不抽男优出糗的（那是替玩家写身体）；剧本「变」里已经写了的那件不再抽
+  var MISHAP_NEED = [
+    [/婚戒/, /人妻|妻子|新妻|新婚|婚戒|戒指|丈夫|老公/], [/浴衣/, /浴衣|温泉|旅馆|和服|祭/], [/温泉/, /温泉/], [/泳池/, /泳池|游泳/],
+    [/比基尼/, /比基尼|泳|海边|沙滩/], [/晒痕/, /晒|海边|沙滩|泳/], [/野球拳/, /野球拳/], [/钢管/, /钢管/],
+    [/外景/, /外景|户外|野外|公园|海边|沙滩|天台|街头/], [/VR/, /VR/], [/情人旅馆/, /旅馆|宾馆|酒店/], [/天花板镜子/, /镜/],
+    [/跳蛋/, /跳蛋|遥控/], [/按摩器/, /按摩|震动|电マ/], [/绳师/, /绳|缚/], [/手铐/, /手铐/], [/蜡烛/, /蜡/], [/鞭子/, /鞭/],
+    [/口球/, /口球/], [/拘束椅/, /拘束/], [/女王/, /女王/], [/催眠|怀表/, /催眠/], [/时间停止/, /时间停止|时停/], [/孕妇/, /孕/],
+  ];
+  var MISHAP_MALE = /^男优|男优袜子|对手戏男优|M 男/;
+  function mishapPool(sc, opt) {
+    opt = opt || {};
+    var text = sc ? scriptAllText(sc) : '', avoid = opt.avoid || [];
+    var two = !!sc && sc.lineup === '两男一女', pov = !!opt.pov || isPovSc(sc);
+    return poolOf('mishap', tierIdx(sc && sc.tier)).filter(function (m) {
+      if (avoid.indexOf(m) >= 0) return false;
+      if (opt.self && MISHAP_MALE.test(m)) return false;
+      if (/第一视角/.test(m) && !pov) return false;
+      if (/3P|另一位男优/.test(m) && !two) return false;
+      return MISHAP_NEED.every(function (r) { return !r[0].test(m) || r[1].test(text); });
+    });
+  }
   // 拍完以后才出的事（撤片、平台审核、打码、AI 同款、片名撞车）：剪辑、发售那几天从日历上弹
   function afterMishaps() { return (SLOTS.mishap || []).filter(function (it) { return (it[2] || '').indexOf('A') >= 0; }).map(function (it) { return it[0]; }); }
 
@@ -2864,7 +2886,10 @@ var PIANCHANG_CORE = (function () {
     var cam = low ? [] : poseCamLines(scenePoses(s.f['姿势']));
     if (cam.length) a.push('【姿势配机位】' + cam.join('／'));
     if (!s.full) a.push('（这一场的台词还没写，照「要」现场演，台词由在场的人自己说。）');
-    if (mis) a.push('【片场意外】这一场开拍时出了一件事，写进这一场：' + mis);
+    // v0.1.53（10091009mc「前面才让她戴好了，后面又错了」）：这一场正文回过一楼（repCur）以后不再叫它写，改成「已经出过了」
+    var misOld = !!mis && shoot.repCur === shoot.cur;
+    if (mis) a.push(misOld ? '【片场意外】这一场开头已经出过一件事：' + mis + '。前面写过了就算过去了，处理好的别让它再出一遍，接着往下拍。'
+      : '【片场意外】这一场开拍时出了一件事，写进这一场：' + mis + '。跟眼下的情形对不上（比如说的是衣服，她这会儿已经没穿；说的东西这一场没有），就换一件对得上的片场小意外。');
     var actRule = '不写 {{user}} 的动作、表情、身体反应和心里，只写别人对他做的、对他说的；「提示·{{user}}」那句是给他的方向，留给他自己说出口。球踢给他就停：有人问他、等他回应，写完对方的动作和台词就收笔，把回合交回玩家。';
     if (pov && !nd) {
       a.push('【玩家的位子】{{user}} 坐男优位·主（在场里标了【{{user}}】），喊开机、喊卡也是 {{user}}。' + actRule + '男优位·二（有的话）是 NPC 男优，你来演。');
@@ -2878,7 +2903,7 @@ var PIANCHANG_CORE = (function () {
       a.push('【玩家的位子】{{user}} 是导演：「导」和「镜」是给他的提示，他会在消息里喊开机、喊卡、改机位、给演员说戏；演员和摄影照他的话走。男优位·主、二都是 NPC 男优，你来演。导演没喊卡之前，这一条照剧本往下拍。');
     }
     function obj0() { return '，喊开机、喊卡也是 {{user}}：柯大河掌机，{{user}} 自己在镜头里'; }
-    a.push(ONE_TAKE + (mis ? '【片场意外】那件事照写，但不打断正在拍的亲热：放在开拍前，或者演员顺着它接着演。' : ''));
+    a.push(ONE_TAKE + (mis && !misOld ? '【片场意外】那件事照写，但不打断正在拍的亲热：放在开拍前，或者演员顺着它接着演。' : ''));
     // 安全词「大头菜」和「一场最多三个有名字的人」在常开世界书【常开】片场规矩里，这里不重复
     if (shoot.note) a.push('【刚才】' + shoot.note);
     return a.join('\n');
@@ -3742,7 +3767,7 @@ var PIANCHANG_CORE = (function () {
     dateOf: dateOf, dayOfDate: dayOfDate, mdText: mdText, mdShort: mdShort, ymText: ymText, monthKey: monthKey, isFirst: isFirst, dayFromMD: dayFromMD, WD_ZH: WD_ZH,
     moneyText: moneyText, moneyShort: moneyShort,
     canShootDay: canShootDay, daysToShoot: daysToShoot, checkEnd: checkEnd, checkDrawP: checkDrawP, checkFailP: checkFailP,
-    poolOf: poolOf, drawSlots: drawSlots, isTokuPlan: isTokuPlan, isTokuSc: isTokuSc, setTokuWork: setTokuWork, TOKU_TAG: TOKU_TAG, TOKU_ANY: TOKU_ANY, slotBraces: slotBraces, slotGet: slotGet, rollMishap: rollMishap, afterMishaps: afterMishaps, LINEUPS: LINEUPS, sceneCount: sceneCount,
+    poolOf: poolOf, drawSlots: drawSlots, isTokuPlan: isTokuPlan, isTokuSc: isTokuSc, setTokuWork: setTokuWork, TOKU_TAG: TOKU_TAG, TOKU_ANY: TOKU_ANY, slotBraces: slotBraces, slotGet: slotGet, rollMishap: rollMishap, mishapPool: mishapPool, afterMishaps: afterMishaps, LINEUPS: LINEUPS, sceneCount: sceneCount,
     poseFamily: poseFamily, POSE_CAM: POSE_CAM, poseCamLines: poseCamLines, scenePoses: scenePoses, drawPoses: drawPoses, tagNames: tagNames, fixTags: fixTags, isPovSc: isPovSc, POV: POV, povOf: povOf, tagFix: tagFix, headForShoot: headForShoot, ncKey: ncKey, NC_RECENT: NC_RECENT,
     STYLE_JA: STYLE_JA, STYLE_JA_POV: STYLE_JA_POV, MULTI_RULES: MULTI_RULES, scFilterOk: scFilterOk, scFilterOn: scFilterOn, scFilterBar: scFilterBar, scFilterClick: scFilterClick,
     buildStep1: buildStep1, buildStep2: buildStep2, STEP1_RETRY: STEP1_RETRY, STEP1_ROLE_RETRY: STEP1_ROLE_RETRY, rolesOk: rolesOk, rolesLine: rolesLine, STEP2_RETRY: STEP2_RETRY,
@@ -11300,8 +11325,10 @@ var PIANCHANG_ONLINE = (function () {
     return { ok: !why.length, why: why, warn: warn, cost: cost };
   }
   // 开机前从「片场意外」格抽一条，落在随机一场（第一场就出事的话开机时就告诉你）；之后每场再掷两成
-  function startMishap(sc, sh) {
-    var pool = C.poolOf('mishap', C.tierIdx(sc.tier)), m = C.pick(pool) || '';
+  //   v0.1.53：只抽跟剧本对得上的（C.mishapPool），剧本「变」里写过的那件不再抽，{{user}} 坐男优位·主时不抽男优出糗的
+  function mishapOpt(sh, rec, fk) { return { avoid: [rec && rec.mishap].concat(Object.keys(sh.mishap || {}).map(function (k) { return sh.mishap[k]; })).filter(Boolean), self: fk === 'act' || selfIn(sh), pov: !!sh.pov }; }
+  function startMishap(sc, sh, rec, fk) {
+    var pool = C.mishapPool(sc, mishapOpt(sh, rec, fk)), m = C.pick(pool) || '';
     if (!m) return '';
     var at = sc.scenes[C.randInt(sc.scenes.length)].n; sh.mishap[at] = m; sh.mishapAt = at;
     return at === sc.scenes[0].n ? m : '';
@@ -11321,7 +11348,7 @@ var PIANCHANG_ONLINE = (function () {
       id: C.uid('k'), scriptId: rec.id, title: sc.title, tier: sc.tier, lineup: sc.lineup, cast: clone(UI.sh.cast), seatCall: selfCall, cur: 0, done: [], hook: '', status: '',
       mishap: {}, ng: 0, ngLog: [], paused: false, note: '', day: st.day, cost: chk.cost, total: sc.scenes.length, pov: selfKind === 'pov', self: selfKind, dirBy: dirBy, finishes: {}, place: (placeOf(st, UI.sh.place) || {}).place || '',
     };
-    var m = startMishap(sc, sh), twice = false;
+    var m = startMishap(sc, sh, rec, 'dir'), twice = false;
     await save(function (s) {
       if (s.dir.shoot) { twice = true; return; }   // 「开机」连点两下：第二下等第一下存完再看，已经在拍了就不再扣一遍钱
       s.dir.shoot = sh;
@@ -11371,7 +11398,7 @@ var PIANCHANG_ONLINE = (function () {
     she.forEach(function (r, i) { cast[r.call] = names[i] || g.costar; });
     sc.roles.filter(function (r) { return r.side === '他' && r.seat === '二'; }).forEach(function (r) { cast[r.call] = g.second || '老钟'; });
     var sh = { id: C.uid('k'), gigId: g.id, scriptId: sid, title: sc.title, tier: sc.tier, lineup: sc.lineup, cast: cast, seatCall: seat, cur: 0, done: [], hook: '', status: '', mishap: {}, ng: 0, ngLog: [], paused: false, note: '', day: st.day, total: sc.scenes.length, finishes: {} };
-    var m = startMishap(sc, sh);
+    var m = startMishap(sc, sh, rec, 'act');
     await save(function (s) { s.act.shoot = sh; addNews(s, '进了' + g.where + '，' + g.studio + '的《' + sc.title + '》开机，女主' + g.costar); });
     applyShoot(); UI.tab = 'shoot'; lsSet(TAB_KEY, UI.tab); render();
     toast('success', '进棚：《' + sc.title + '》第 1 场' + (m ? '。片场意外：' + m : ''));
@@ -11426,7 +11453,7 @@ var PIANCHANG_ONLINE = (function () {
       if (txt) { var p = C.statusPrompt(sc, sh, txt); status = C.parseStatus(await genAsk(p, '', 'pianchang-st-' + Date.now().toString(36))); }
     } catch (e) { status = ''; }
     if (ep !== EPOCH) return;
-    var nx = sc.scenes[sh.cur + 1], m = sh.mishap[nx.n] ? '' : (C.rndFloat() < 0.2 ? C.pick(C.poolOf('mishap', C.tierIdx(sc.tier)).filter(function (x) { return Object.keys(sh.mishap).every(function (k) { return sh.mishap[k] !== x; }); })) || '' : '');
+    var nx = sc.scenes[sh.cur + 1], m = sh.mishap[nx.n] ? '' : (C.rndFloat() < 0.2 ? C.pick(C.mishapPool(sc, mishapOpt(sh, scriptRec(st, sh.scriptId), fk))) || '' : '');
     var preset = sh.mishap[nx.n] || '';
     await save(function (s2) {
       var x = s2[fk].shoot; if (!x) return;
@@ -13908,6 +13935,8 @@ var PIANCHANG_ONLINE = (function () {
     var st = readState(), sc = st.scene;
     if (sc && !sc.got) { GOT_MEM = sc.at; save(function (s) { if (s.scene && s.scene.at === sc.at) s.scene.got = true; }); }
     var sh = curShoot(st); if (sh && sh.note && !sh.noteGot) save(function (s) { var x = curShoot(s); if (x) x.noteGot = true; });
+    // v0.1.53：这一场正文回过一楼了，片场意外下一轮改成「已经出过了」（以前每轮都叫它写一遍，戴好的婚戒下一轮又戴错）
+    if (sh && sh.repCur !== sh.cur && type !== 'impersonate' && type !== 'quiet') save(function (s) { var x = curShoot(s); if (x) x.repCur = x.cur; });
   }
   function onUserSent(mesId) {
     userSent(mesId);
